@@ -24,7 +24,7 @@ This system replaces the manual, paper-based workflow with an **efficient digita
 |-----------------|--------------------------------------------|
 | 🎨 **Frontend** | React.js (Vite), Tailwind CSS              |
 | ⚙️ **Backend**  | Node.js, Express.js                        |
-| 🗄️ **Database** | PostgreSQL (Supabase)                      |
+| 🗄️ **Database** | PostgreSQL (NeonDB  )                      |
 | 🔑 **Auth**     | JWT (JSON Web Tokens), bcrypt              |
 
 ---

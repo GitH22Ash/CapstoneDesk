@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@sentry/react": "^10.44.0",
     "@tailwindcss/vite": "^4.1.13",
     "axios": "^1.12.2",
     "react": "^19.1.1",
