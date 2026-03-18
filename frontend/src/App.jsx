@@ -1,38 +1,35 @@
-import { BrowserRouter as Router, Route, Routes, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 
-// Import your page components
-// Make sure to create these files with a .jsx extension inside src/components/
-import GroupRegistration from './components/GroupRegistration';
+// Import page components
+import LandingPage from './components/LandingPage';
+import StudentAuth from './components/StudentAuth';
+import GroupSignup from './components/GroupSignup';
+import StudentDashboard from './components/StudentDashboard';
 import SupervisorLogin from './components/SupervisorLogin';
 import SupervisorDashboard from './components/SupervisorDashboard';
+import AdminLogin from './components/AdminLogin';
 import AdminPanel from './components/AdminPanel';
 
 function App() {
   return (
     <Router>
-      <div className="bg-gray-50 min-h-screen">
-        <div className="container mx-auto p-4">
-          <nav className="bg-blue-600 text-white p-4 rounded-md shadow-lg mb-8">
-            <div className="container mx-auto flex justify-between items-center">
-              <Link to="/" className="font-bold text-xl hover:text-blue-200 transition-colors">Project Allocator</Link>
-              <div className="flex items-center space-x-4">
-                <Link to="/" className="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors">Register Group</Link>
-                <Link to="/supervisor/login" className="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors">Supervisor Login</Link>
-                <Link to="/admin" className="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors">Admin Panel</Link>
-              </div>
-            </div>
-          </nav>
+      <Routes>
+        {/* Landing Page */}
+        <Route path="/" element={<LandingPage />} />
 
-          <main className="bg-white p-6 rounded-md shadow-lg">
-            <Routes>
-              <Route path="/" element={<GroupRegistration />} />
-              <Route path="/supervisor/login" element={<SupervisorLogin />} />
-              <Route path="/supervisor/dashboard" element={<SupervisorDashboard />} />
-              <Route path="/admin" element={<AdminPanel />} />
-            </Routes>
-          </main>
-        </div>
-      </div>
+        {/* Student Routes */}
+        <Route path="/student" element={<StudentAuth />} />
+        <Route path="/student/signup/members" element={<GroupSignup />} />
+        <Route path="/student/dashboard" element={<StudentDashboard />} />
+
+        {/* Supervisor Routes */}
+        <Route path="/supervisor/login" element={<SupervisorLogin />} />
+        <Route path="/supervisor/dashboard" element={<SupervisorDashboard />} />
+
+        {/* Admin Routes */}
+        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/admin/panel" element={<AdminPanel />} />
+      </Routes>
     </Router>
   );
 }

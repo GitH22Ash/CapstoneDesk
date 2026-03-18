@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { API } from '../api'; // adjust path if your file structure differs
+import { useNavigate, Link } from 'react-router-dom';
+import { API } from '../api';
 
 function SupervisorDashboard() {
     const [groups, setGroups] = useState([]);
+    const [expandedGroup, setExpandedGroup] = useState(null);
     const [maxGroups, setMaxGroups] = useState(5);
     const [showPreferences, setShowPreferences] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -21,7 +22,6 @@ function SupervisorDashboard() {
 
             try {
                 setLoading(true);
-                // axios requests use API which attaches token via interceptor
                 const [groupsRes, prefRes] = await Promise.all([
                     API.get('/supervisors/my-groups'),
                     API.get('/supervisors/preferences')
@@ -32,8 +32,6 @@ function SupervisorDashboard() {
                 console.error("Error fetching dashboard data:", err);
                 setError('Failed to load dashboard data. Please log in again.');
                 localStorage.removeItem('token');
-                // optionally redirect to login after a short delay:
-                // setTimeout(() => navigate('/supervisor/login'), 1200);
             } finally {
                 setLoading(false);
             }
@@ -43,13 +41,6 @@ function SupervisorDashboard() {
     }, [navigate]);
 
     const handlePreferencesUpdate = async () => {
-        const token = localStorage.getItem('token');
-        if (!token) {
-            setError('Please login again.');
-            navigate('/supervisor/login');
-            return;
-        }
-
         try {
             setLoading(true);
             await API.put('/supervisors/preferences', { max_groups: maxGroups });
@@ -57,27 +48,24 @@ function SupervisorDashboard() {
             setShowPreferences(false);
             setTimeout(() => setSuccess(''), 3000);
         } catch (err) {
-            console.error('Failed to update preferences:', err);
-            setError(err.response?.data?.msg || 'Failed to update preferences. Please try again.');
+            setError(err.response?.data?.msg || 'Failed to update preferences.');
         } finally {
             setLoading(false);
         }
     };
 
     const handleMarkUpdate = async (student_reg_no, group_id, review_number, marks) => {
-        const payload = {
-            student_reg_no,
-            group_id,
-            review_number,
-            marks: marks === '' ? null : Number(marks)
-        };
-
         try {
-            await API.put('/supervisors/marks', payload);
+            await API.put('/supervisors/marks', {
+                student_reg_no,
+                group_id,
+                review_number,
+                marks: marks === '' ? null : Number(marks)
+            });
             setError('');
         } catch (err) {
             console.error('Failed to update mark:', err);
-            setError(`Failed to update mark for student ${student_reg_no}. Please refresh and try again.`);
+            setError(`Failed to update mark for student ${student_reg_no}.`);
         }
     };
 
@@ -87,105 +75,216 @@ function SupervisorDashboard() {
         setGroups(newGroups);
     };
 
-    if (loading) return <p className="text-center">Loading dashboard...</p>;
+    const handleLogout = () => {
+        localStorage.removeItem('token');
+        navigate('/');
+    };
+
+    const toggleGroup = (groupId) => {
+        setExpandedGroup(expandedGroup === groupId ? null : groupId);
+    };
+
+    if (loading) {
+        return (
+            <div className="page-container">
+                <div className="bg-grid" />
+                <div className="page-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>Loading dashboard...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
-        <div>
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold">Supervisor Dashboard</h1>
-                <button
-                    onClick={() => setShowPreferences(!showPreferences)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
-                >
-                    Group Preferences
-                </button>
-            </div>
+        <div className="page-container">
+            <div className="bg-grid" />
+            <div className="bg-glow" style={{ top: '-200px', right: '-100px', background: 'rgba(139,92,246,0.2)' }} />
 
-            {showPreferences && (
-                <div className="bg-blue-50 p-6 rounded-lg shadow-md mb-6">
-                    <h3 className="text-lg font-semibold mb-4">Set Maximum Groups</h3>
-                    <div className="flex items-center space-x-4">
-                        <label className="text-sm font-medium">Maximum groups you want to supervise:</label>
-                        <input
-                            type="number"
-                            min="1"
-                            max="20"
-                            value={maxGroups}
-                            onChange={(e) => setMaxGroups(parseInt(e.target.value) || 0)}
-                            className="w-20 p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                        />
+            <div className="page-content" style={{ maxWidth: '960px', margin: '0 auto' }}>
+                {/* Top bar */}
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '2rem',
+                }} className="animate-fade-in">
+                    <Link to="/" className="back-link" style={{ marginBottom: 0 }}>
+                        ← Home
+                    </Link>
+                    <div style={{ display: 'flex', gap: '0.75rem' }}>
                         <button
-                            onClick={handlePreferencesUpdate}
-                            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md transition-colors"
-                            disabled={loading}
+                            className="btn-secondary"
+                            onClick={() => setShowPreferences(!showPreferences)}
+                            style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
                         >
-                            Update
+                            ⚙ Preferences
                         </button>
-                        <button
-                            onClick={() => setShowPreferences(false)}
-                            className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md transition-colors"
-                        >
-                            Cancel
+                        <button className="logout-btn" onClick={handleLogout} id="supervisor-logout-btn">
+                            Logout
                         </button>
                     </div>
-                    <p className="text-sm text-gray-600 mt-2">
-                        Currently assigned: {groups.length} groups | Maximum: {maxGroups} groups
+                </div>
+
+                {/* Header */}
+                <div className="animate-fade-in-up" style={{ marginBottom: '2rem' }}>
+                    <h1 style={{
+                        fontSize: '2.25rem',
+                        fontWeight: 800,
+                        background: 'linear-gradient(135deg, #8b5cf6, #d946ef)',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        marginBottom: '0.5rem',
+                    }}>
+                        Supervisor Dashboard
+                    </h1>
+                    <p style={{ color: 'var(--text-muted)' }}>
+                        {groups.length} group{groups.length !== 1 ? 's' : ''} assigned to you
                     </p>
                 </div>
-            )}
 
-            {error && <p className="text-center text-red-500 bg-red-100 p-3 rounded-md mb-4">{error}</p>}
-            {success && <p className="text-center text-green-500 bg-green-100 p-3 rounded-md mb-4">{success}</p>}
-
-            {groups.length === 0 ? (
-                <div className="text-center py-8">
-                    <p className="text-gray-600 mb-4">No groups have been assigned to you yet.</p>
-                    <p className="text-sm text-gray-500">
-                        Check back later after the admin has assigned groups.
-                    </p>
-                </div>
-            ) : (
-                <div className="space-y-8">
-                    {groups.map((group, groupIndex) => (
-                        <div key={group.group_id} className="bg-gray-50 p-6 rounded-lg shadow-md">
-                            <h2 className="text-2xl font-semibold mb-4 text-blue-700">{group.group_name}</h2>
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-gray-200">
-                                    <thead className="bg-gray-100">
-                                        <tr>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student Name</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reg. No</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Review 1</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Review 2</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Review 3</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Review 4</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="bg-white divide-y divide-gray-200">
-                                        {group.members.map((member, memberIndex) => (
-                                            <tr key={member.reg_no}>
-                                                <td className="px-6 py-4 whitespace-nowrap">{member.name}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap">{member.reg_no}</td>
-                                                {[1, 2, 3, 4].map(reviewNumber => (
-                                                    <td key={reviewNumber} className="px-6 py-4 whitespace-nowrap">
-                                                        <input
-                                                            type="number"
-                                                            className="w-20 p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                                                            value={member[`review${reviewNumber}_marks`] ?? ''}
-                                                            onChange={(e) => handleInputChange(e, groupIndex, memberIndex, reviewNumber)}
-                                                            onBlur={(e) => handleMarkUpdate(member.reg_no, group.group_id, reviewNumber, e.target.value)}
-                                                        />
-                                                    </td>
-                                                ))}
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                {/* Preferences Panel */}
+                {showPreferences && (
+                    <div className="glass-card animate-fade-in" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
+                        <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem' }}>Group Preferences</h3>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                            <label style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Maximum groups:</label>
+                            <input
+                                type="number"
+                                min="1"
+                                max="20"
+                                value={maxGroups}
+                                onChange={(e) => setMaxGroups(parseInt(e.target.value) || 0)}
+                                className="form-input"
+                                style={{ width: '80px' }}
+                            />
+                            <button className="btn-success" onClick={handlePreferencesUpdate} style={{ width: 'auto', padding: '0.5rem 1.25rem', fontSize: '0.85rem' }}>
+                                Update
+                            </button>
+                            <button className="btn-secondary" onClick={() => setShowPreferences(false)} style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}>
+                                Cancel
+                            </button>
                         </div>
-                    ))}
-                </div>
-            )}
+                        <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.75rem' }}>
+                            Currently assigned: {groups.length} groups | Maximum: {maxGroups} groups
+                        </p>
+                    </div>
+                )}
+
+                {/* Alerts */}
+                {error && <div className="alert alert-error" style={{ marginBottom: '1rem' }}>{error}</div>}
+                {success && <div className="alert alert-success" style={{ marginBottom: '1rem' }}>{success}</div>}
+
+                {/* Groups */}
+                {groups.length === 0 ? (
+                    <div className="empty-state animate-fade-in-up">
+                        <div className="empty-state-icon">📋</div>
+                        <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '0.5rem' }}>
+                            Currently no groups are assigned
+                        </h3>
+                        <p style={{ color: 'var(--text-muted)', maxWidth: '400px', margin: '0 auto' }}>
+                            Check back later after the admin has assigned groups to you.
+                        </p>
+                    </div>
+                ) : (
+                    <div>
+                        {groups.map((group, groupIndex) => (
+                            <div key={group.group_id} className={`group-dropdown animate-fade-in-up delay-${Math.min(groupIndex + 1, 5)}`}>
+                                <div
+                                    className="group-dropdown-header"
+                                    onClick={() => toggleGroup(group.group_id)}
+                                    id={`group-toggle-${group.group_id}`}
+                                >
+                                    <div>
+                                        <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                            {group.group_name}
+                                        </h3>
+                                        <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.25rem' }}>
+                                            {group.members.length} members
+                                        </p>
+                                    </div>
+                                    <span style={{
+                                        fontSize: '1.25rem',
+                                        transition: 'transform 0.3s ease',
+                                        transform: expandedGroup === group.group_id ? 'rotate(180deg)' : 'rotate(0deg)',
+                                        color: 'var(--text-muted)',
+                                    }}>
+                                        ▾
+                                    </span>
+                                </div>
+
+                                <div className={`group-dropdown-body ${expandedGroup === group.group_id ? 'open' : ''}`}>
+                                    <div className="group-dropdown-content">
+                                        {group.members.map((member, memberIndex) => (
+                                            <div
+                                                key={member.reg_no}
+                                                style={{
+                                                    background: 'rgba(255,255,255,0.02)',
+                                                    borderRadius: '12px',
+                                                    padding: '1.25rem',
+                                                    marginBottom: memberIndex < group.members.length - 1 ? '0.75rem' : 0,
+                                                    border: '1px solid rgba(255,255,255,0.05)',
+                                                }}
+                                            >
+                                                {/* Student info row */}
+                                                <div style={{
+                                                    display: 'grid',
+                                                    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                                                    gap: '1rem',
+                                                    marginBottom: '1rem',
+                                                }}>
+                                                    <div>
+                                                        <p style={{ color: 'var(--text-muted)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Name</p>
+                                                        <p style={{ fontWeight: 600, fontSize: '0.95rem' }}>{member.name}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p style={{ color: 'var(--text-muted)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Reg. No</p>
+                                                        <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{member.reg_no}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p style={{ color: 'var(--text-muted)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>CGPA</p>
+                                                        <p style={{ fontWeight: 600, color: 'var(--accent-emerald)' }}>{member.cgpa}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p style={{ color: 'var(--text-muted)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email</p>
+                                                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{member.email || '—'}</p>
+                                                    </div>
+                                                </div>
+
+                                                {/* Review marks row */}
+                                                <div style={{
+                                                    display: 'grid',
+                                                    gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))',
+                                                    gap: '0.75rem',
+                                                    paddingTop: '1rem',
+                                                    borderTop: '1px solid rgba(255,255,255,0.05)',
+                                                }}>
+                                                    {[1, 2, 3].map(reviewNumber => (
+                                                        <div key={reviewNumber}>
+                                                            <p style={{ color: 'var(--text-muted)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>
+                                                                Review {reviewNumber}
+                                                            </p>
+                                                            <input
+                                                                type="number"
+                                                                className="form-input"
+                                                                style={{ padding: '0.5rem 0.75rem', fontSize: '0.9rem', textAlign: 'center' }}
+                                                                value={member[`review${reviewNumber}_marks`] ?? ''}
+                                                                onChange={(e) => handleInputChange(e, groupIndex, memberIndex, reviewNumber)}
+                                                                onBlur={(e) => handleMarkUpdate(member.reg_no, group.group_id, reviewNumber, e.target.value)}
+                                                                placeholder="—"
+                                                                id={`mark-${group.group_id}-${member.reg_no}-r${reviewNumber}`}
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

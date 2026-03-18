@@ -44,57 +44,12 @@ router.get('/preferences', auth, async (req, res) => {
             return res.status(404).json({ msg: 'Supervisor not found' });
         }
 
-        res.json({ max_groups: result.rows[0].max_groups || 5 }); // Default to 5 if not set
+        res.json({ max_groups: result.rows[0].max_groups || 5 });
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server Error');
     }
 });
-
-// @route   POST api/supervisors/register
-// @desc    Register a new supervisor
-// @access  Public
-router.post('/register', async (req, res) => {
-    // console.log(req.body);
-    const { emp_id, name, email, password } = req.body;
-    
-
-    // Simple validation
-    if (!emp_id || !name || !email || !password) {
-        return res.status(400).json({ msg: 'Please enter all fields' });
-    }
-
-    try {
-        // Check for existing supervisor by email or emp_id
-        const existingSupervisor = await db.query(
-            "SELECT * FROM supervisors WHERE email = $1 OR emp_id = $2",
-            [email, emp_id]
-        );
-
-        if (existingSupervisor.rows.length > 0) {
-            return res.status(400).json({ msg: 'Supervisor with this email or employee ID already exists' });
-        }
-
-        // Hash the password
-        const salt = await bcrypt.genSalt(10);
-        const password_hash = await bcrypt.hash(password, salt);
-
-        // Insert new supervisor into the database
-        const newSupervisor = await db.query(
-            "INSERT INTO supervisors (emp_id, name, email, password_hash) VALUES ($1, $2, $3, $4) RETURNING emp_id, name, email",
-            [emp_id, name, email, password_hash]
-        );
-        res.status(201).json({
-            msg: "Supervisor registered successfully!",
-            supervisor: newSupervisor.rows[0]
-        });
-
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server error');
-    }
-});
-
 
 // @route   POST api/supervisors/login
 // @desc    Authenticate supervisor & get token
@@ -132,7 +87,7 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// @route   GET api/my-groups
+// @route   GET api/supervisors/my-groups
 // @desc    Get all groups assigned to the logged-in supervisor
 // @access  Private
 router.get('/my-groups', auth, async (req, res) => {
@@ -149,7 +104,8 @@ router.get('/my-groups', auth, async (req, res) => {
 
         for (let group of groups) {
             const membersResult = await db.query(
-                `SELECT s.reg_no, s.name, s.cgpa, m.review1_marks, m.review2_marks, m.review3_marks, m.review4_marks
+                `SELECT s.reg_no, s.name, s.cgpa, s.email,
+                        m.review1_marks, m.review2_marks, m.review3_marks, m.review4_marks
                  FROM students s
                  JOIN group_members gm ON s.reg_no = gm.student_reg_no
                  LEFT JOIN marks m ON s.reg_no = m.student_reg_no AND gm.group_id = m.group_id
@@ -166,7 +122,7 @@ router.get('/my-groups', auth, async (req, res) => {
     }
 });
 
-// @route   PUT api/marks
+// @route   PUT api/supervisors/marks
 // @desc    Update marks for a student
 // @access  Private
 router.put('/marks', auth, async (req, res) => {
@@ -178,20 +134,17 @@ router.put('/marks', auth, async (req, res) => {
     }
 
     try {
-        // Check if a marks entry already exists
         const existingMark = await db.query(
             'SELECT * FROM marks WHERE student_reg_no = $1 AND group_id = $2',
             [student_reg_no, group_id]
         );
 
         if (existingMark.rows.length > 0) {
-            // Update existing entry
             await db.query(
                 `UPDATE marks SET ${reviewColumn} = $1 WHERE student_reg_no = $2 AND group_id = $3`,
                 [marks, student_reg_no, group_id]
             );
         } else {
-            // Insert new entry
             await db.query(
                 `INSERT INTO marks (student_reg_no, group_id, ${reviewColumn}) VALUES ($1, $2, $3)`,
                 [student_reg_no, group_id, marks]
@@ -205,4 +158,3 @@ router.put('/marks', auth, async (req, res) => {
 });
 
 module.exports = router;
-

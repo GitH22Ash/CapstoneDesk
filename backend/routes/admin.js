@@ -2,6 +2,31 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+
+// Endpoint: POST /api/admin/login
+// Purpose: Authenticate admin using env-based credentials
+router.post('/login', (req, res) => {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+        return res.status(400).json({ msg: 'Please provide email and password.' });
+    }
+
+    const adminEmail = process.env.ADMIN_EMAIL;
+    const adminPassword = process.env.ADMIN_PASSWORD;
+
+    if (email !== adminEmail || password !== adminPassword) {
+        return res.status(400).json({ msg: 'Invalid admin credentials.' });
+    }
+
+    // Generate an admin JWT token
+    const payload = { admin: true };
+    jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '5h' }, (err, token) => {
+        if (err) throw err;
+        res.json({ token, msg: 'Admin login successful.' });
+    });
+});
 
 // Endpoint: GET /api/admin/supervisors
 // Purpose: Get all registered supervisors with their current group counts
@@ -12,11 +37,11 @@ router.get('/supervisors', async (req, res) => {
                 s.emp_id,
                 s.name,
                 s.email,
-                5 as max_groups,
+                s.max_groups,
                 COUNT(pg.group_id) as current_groups
             FROM supervisors s
             LEFT JOIN project_groups pg ON s.emp_id = pg.assigned_supervisor_id
-            GROUP BY s.emp_id, s.name, s.email
+            GROUP BY s.emp_id, s.name, s.email, s.max_groups
             ORDER BY s.name
         `;
         const result = await db.query(query);
@@ -59,16 +84,15 @@ router.put('/groups/:groupId/assign', async (req, res) => {
     const { supervisorId } = req.body;
 
     try {
-        // Check if supervisor exists and get their current group count
         const supervisorCheck = await db.query(`
             SELECT
                 s.emp_id,
-                5 as max_groups,
+                s.max_groups,
                 COUNT(pg.group_id) as current_groups
             FROM supervisors s
             LEFT JOIN project_groups pg ON s.emp_id = pg.assigned_supervisor_id
             WHERE s.emp_id = $1
-            GROUP BY s.emp_id
+            GROUP BY s.emp_id, s.max_groups
         `, [supervisorId]);
 
         if (supervisorCheck.rows.length === 0) {
@@ -82,13 +106,11 @@ router.put('/groups/:groupId/assign', async (req, res) => {
             });
         }
 
-        // Check if group exists
         const groupCheck = await db.query('SELECT group_id FROM project_groups WHERE group_id = $1', [groupId]);
         if (groupCheck.rows.length === 0) {
             return res.status(404).json({ msg: 'Group not found' });
         }
 
-        // Assign the group
         await db.query(
             'UPDATE project_groups SET assigned_supervisor_id = $1 WHERE group_id = $2',
             [supervisorId, groupId]
@@ -119,18 +141,31 @@ router.put('/groups/:groupId/unassign', async (req, res) => {
 });
 
 // Endpoint: POST /api/admin/supervisors/create
-// Purpose: To create a new supervisor account. This is an admin-level task.
+// Purpose: To create a new supervisor account. Admin-only.
 router.post('/supervisors/create', async (req, res) => {
     const { emp_id, name, email, password } = req.body;
+
+    if (!emp_id || !name || !email || !password) {
+        return res.status(400).json({ msg: 'Please fill out all fields.' });
+    }
+
     try {
-        // Hash the password before storing it for security
+        // Check for existing supervisor
+        const existing = await db.query(
+            'SELECT emp_id FROM supervisors WHERE email = $1 OR emp_id = $2',
+            [email, emp_id]
+        );
+        if (existing.rows.length > 0) {
+            return res.status(400).json({ msg: 'Supervisor with this email or employee ID already exists.' });
+        }
+
         const salt = await bcrypt.genSalt(10);
         const password_hash = await bcrypt.hash(password, salt);
 
-        // Insert the new supervisor into the database
-        // "ON CONFLICT(emp_id) DO NOTHING" prevents errors if a supervisor with that ID already exists
-        const query = 'INSERT INTO supervisors (emp_id, name, email, password_hash) VALUES ($1, $2, $3, $4) ON CONFLICT(emp_id) DO NOTHING';
-        await db.query(query, [emp_id, name, email, password_hash]);
+        await db.query(
+            'INSERT INTO supervisors (emp_id, name, email, password_hash) VALUES ($1, $2, $3, $4)',
+            [emp_id, name, email, password_hash]
+        );
         
         res.status(201).json({ msg: 'Supervisor created successfully.' });
     } catch (err) {
@@ -140,27 +175,24 @@ router.post('/supervisors/create', async (req, res) => {
 });
 
 // Endpoint: POST /api/admin/assign-groups
-// Purpose: To automatically and randomly assign all unassigned groups to supervisors based on their preferences.
+// Purpose: Automatically assign all unassigned groups to supervisors
 router.post('/assign-groups', async (req, res) => {
     try {
-        // Step 1: Fetch all groups that don't have a supervisor yet.
         const groupsRes = await db.query('SELECT group_id FROM project_groups WHERE assigned_supervisor_id IS NULL');
         
-        // Step 2: Fetch all available supervisors with their preferences and current group counts.
         const supervisorsRes = await db.query(`
             SELECT
                 s.emp_id,
-                5 as max_groups,
+                s.max_groups,
                 COUNT(pg.group_id) as current_groups
             FROM supervisors s
             LEFT JOIN project_groups pg ON s.emp_id = pg.assigned_supervisor_id
-            GROUP BY s.emp_id
+            GROUP BY s.emp_id, s.max_groups
         `);
         
         let groups = groupsRes.rows;
         const supervisors = supervisorsRes.rows;
 
-        // Handle edge cases where assignment is not possible
         if (supervisors.length === 0) {
             return res.status(400).json({ msg: 'No supervisors available to assign groups.' });
         }
@@ -168,42 +200,34 @@ router.post('/assign-groups', async (req, res) => {
             return res.status(200).json({ msg: 'No unassigned groups to assign.' });
         }
 
-        // Step 3: Filter supervisors who can still take more groups
         const availableSupervisors = supervisors.filter(s => s.current_groups < s.max_groups);
         
         if (availableSupervisors.length === 0) {
             return res.status(400).json({ msg: 'All supervisors have reached their maximum group capacity.' });
         }
 
-        // Step 4: Create a weighted list of supervisors based on remaining capacity
         const supervisorPool = [];
         availableSupervisors.forEach(supervisor => {
             const remainingCapacity = supervisor.max_groups - supervisor.current_groups;
-            // Add supervisor multiple times based on remaining capacity for fair distribution
             for (let i = 0; i < remainingCapacity; i++) {
                 supervisorPool.push(supervisor.emp_id);
             }
         });
 
-        // Step 5: Shuffle the groups array to ensure random distribution.
         groups.sort(() => 0.5 - Math.random());
-        
-        // Also shuffle the supervisor pool
         supervisorPool.sort(() => 0.5 - Math.random());
 
-        // Step 6: Assign groups to supervisors
         let poolIndex = 0;
         let assignedCount = 0;
         
         for (const group of groups) {
-            if (poolIndex >= supervisorPool.length) {
-                // If we've exhausted the pool, break (some groups may remain unassigned)
-                break;
-            }
+            if (poolIndex >= supervisorPool.length) break;
             
             const supervisorId = supervisorPool[poolIndex];
-            const updateQuery = 'UPDATE project_groups SET assigned_supervisor_id = $1 WHERE group_id = $2';
-            await db.query(updateQuery, [supervisorId, group.group_id]);
+            await db.query(
+                'UPDATE project_groups SET assigned_supervisor_id = $1 WHERE group_id = $2',
+                [supervisorId, group.group_id]
+            );
             
             assignedCount++;
             poolIndex++;
@@ -223,4 +247,3 @@ router.post('/assign-groups', async (req, res) => {
 });
 
 module.exports = router;
-

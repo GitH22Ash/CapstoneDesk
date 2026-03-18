@@ -44,32 +44,34 @@ const EyeToggle = ({ show, onToggle, id }) => (
     </button>
 );
 
-function SupervisorLogin() {
-    const [email, setEmail] = useState('');
+function StudentAuth() {
+    const [mode, setMode] = useState('login'); // 'login' or 'signup'
+    const [groupName, setGroupName] = useState('');
     const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
-    const handleSubmit = async (e) => {
+    const handleLogin = async (e) => {
         e.preventDefault();
         setError('');
 
-        if (!email || !password) {
+        if (!groupName.trim() || !password) {
             setError('Please fill out all fields.');
             return;
         }
 
         try {
             setLoading(true);
-            const res = await API.post('/supervisors/login', {
-                email,
+            const res = await API.post('/groups/login', {
+                group_name: groupName,
                 password,
             });
-
-            localStorage.setItem('token', res.data.token);
-            navigate('/supervisor/dashboard');
+            sessionStorage.setItem('groupData', JSON.stringify(res.data));
+            navigate('/student/dashboard');
         } catch (err) {
             setError(err.response?.data?.msg || 'Login failed. Please try again.');
         } finally {
@@ -77,10 +79,34 @@ function SupervisorLogin() {
         }
     };
 
+    const handleSignup = (e) => {
+        e.preventDefault();
+        setError('');
+
+        if (!groupName.trim()) {
+            setError('Please enter a group name.');
+            return;
+        }
+        if (!password || password.length < 4) {
+            setError('Password must be at least 4 characters.');
+            return;
+        }
+        if (password !== confirmPassword) {
+            setError('Passwords do not match.');
+            return;
+        }
+
+        sessionStorage.setItem('signupData', JSON.stringify({
+            group_name: groupName,
+            password,
+        }));
+        navigate('/student/signup/members');
+    };
+
     return (
         <div className="page-container">
             <div className="bg-grid" />
-            <div className="bg-glow" style={{ top: '-200px', right: '-100px', background: 'rgba(139,92,246,0.3)' }} />
+            <div className="bg-glow" style={{ top: '-200px', right: '-100px', background: 'rgba(59,130,246,0.3)' }} />
 
             <div className="page-content" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
                 <Link to="/" className="back-link animate-fade-in">
@@ -93,28 +119,46 @@ function SupervisorLogin() {
                         fontWeight: 700,
                         textAlign: 'center',
                         marginBottom: '0.5rem',
-                        background: 'linear-gradient(135deg, #8b5cf6, #d946ef)',
+                        background: 'linear-gradient(135deg, #3b82f6, #06b6d4)',
                         WebkitBackgroundClip: 'text',
                         WebkitTextFillColor: 'transparent',
                     }}>
-                        👨‍🏫 Supervisor Portal
+                        🎓 Student Portal
                     </h2>
                     <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginBottom: '2rem', fontSize: '0.9rem' }}>
-                        Login with your supervisor credentials
+                        Sign up a new group or login to your existing group
                     </p>
+
+                    {/* Toggle */}
+                    <div className="toggle-group" style={{ marginBottom: '2rem' }}>
+                        <button
+                            className={`toggle-btn ${mode === 'login' ? 'active' : ''}`}
+                            onClick={() => { setMode('login'); setError(''); }}
+                            id="student-login-toggle"
+                        >
+                            Group Login
+                        </button>
+                        <button
+                            className={`toggle-btn ${mode === 'signup' ? 'active' : ''}`}
+                            onClick={() => { setMode('signup'); setError(''); }}
+                            id="student-signup-toggle"
+                        >
+                            Group Signup
+                        </button>
+                    </div>
 
                     {error && <div className="alert alert-error" style={{ marginBottom: '1.5rem' }}>{error}</div>}
 
-                    <form onSubmit={handleSubmit}>
+                    <form onSubmit={mode === 'login' ? handleLogin : handleSignup}>
                         <div style={{ marginBottom: '1.25rem' }}>
-                            <label className="form-label">Email / Employee ID</label>
+                            <label className="form-label">Group Name</label>
                             <input
                                 type="text"
                                 className="form-input"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                placeholder="Enter your email"
-                                id="supervisor-email"
+                                value={groupName}
+                                onChange={(e) => setGroupName(e.target.value)}
+                                placeholder="Enter your group name"
+                                id="student-group-name"
                             />
                         </div>
 
@@ -126,39 +170,59 @@ function SupervisorLogin() {
                                     className="form-input"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    placeholder="Enter your password"
-                                    id="supervisor-password"
+                                    placeholder="Enter password"
+                                    id="student-password"
                                     style={{ paddingRight: '3rem' }}
                                 />
                                 <EyeToggle
                                     show={showPassword}
                                     onToggle={() => setShowPassword(prev => !prev)}
-                                    id="supervisor-password-toggle"
+                                    id="student-password-toggle"
                                 />
                             </div>
                         </div>
+
+                        {mode === 'signup' && (
+                            <div style={{ marginBottom: '1.25rem' }} className="animate-fade-in">
+                                <label className="form-label">Confirm Password</label>
+                                <div style={{ position: 'relative' }}>
+                                    <input
+                                        type={showConfirmPassword ? 'text' : 'password'}
+                                        className="form-input"
+                                        value={confirmPassword}
+                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                        placeholder="Re-enter password"
+                                        id="student-confirm-password"
+                                        style={{ paddingRight: '3rem' }}
+                                    />
+                                    <EyeToggle
+                                        show={showConfirmPassword}
+                                        onToggle={() => setShowConfirmPassword(prev => !prev)}
+                                        id="student-confirm-password-toggle"
+                                    />
+                                </div>
+                            </div>
+                        )}
 
                         <button
                             type="submit"
                             className="btn-primary"
                             disabled={loading}
-                            id="supervisor-login-btn"
-                            style={{
-                                marginTop: '0.5rem',
-                                background: 'linear-gradient(135deg, #8b5cf6, #d946ef)',
-                            }}
+                            id="student-submit-btn"
+                            style={{ marginTop: '0.5rem' }}
                         >
-                            {loading ? 'Logging in...' : 'Login'}
+                            {loading
+                                ? 'Please wait...'
+                                : mode === 'login'
+                                    ? 'Login to Group'
+                                    : 'Continue to Add Members →'
+                            }
                         </button>
                     </form>
-
-                    <p style={{ textAlign: 'center', marginTop: '1.5rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                        Supervisor accounts are created by the admin.
-                    </p>
                 </div>
             </div>
         </div>
     );
 }
 
-export default SupervisorLogin;
+export default StudentAuth;

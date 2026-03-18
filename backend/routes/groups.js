@@ -1,20 +1,26 @@
 const express = require('express');
 const router = express.Router();
+const bcrypt = require('bcryptjs');
 const db = require('../db');
 
 // Endpoint: POST /api/groups/register
-// Purpose: To register a new project group with 5 members.
+// Purpose: To register a new project group with 5 members and a group password.
 router.post('/register', async (req, res) => {
-    const { group_name, members } = req.body;
+    const { group_name, password, members } = req.body;
 
     // Validate the incoming data
-    if (!group_name || !members || members.length !== 5) {
-        return res.status(400).json({ msg: 'Please provide a group name and exactly 5 members.' });
+    if (!group_name || !password || !members || members.length !== 5) {
+        return res.status(400).json({ msg: 'Please provide a group name, password, and exactly 5 members.' });
     }
 
     try {
-        // Step 1: Check if any of the provided students are already in a group.
-        // This is the core logic that prevents duplicate student entries across different groups.
+        // Check if group name already exists
+        const existingGroup = await db.query('SELECT group_id FROM project_groups WHERE group_name = $1', [group_name]);
+        if (existingGroup.rows.length > 0) {
+            return res.status(400).json({ msg: 'A group with this name already exists.' });
+        }
+
+        // Check if any of the provided students are already in a group.
         const regNos = members.map(m => m.reg_no);
         const checkStudentQuery = 'SELECT student_reg_no FROM group_members WHERE student_reg_no = ANY($1::varchar[])';
         const existingStudents = await db.query(checkStudentQuery, [regNos]);
@@ -24,26 +30,29 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ msg: `Student with registration number ${existingRegNo} is already in a group.` });
         }
 
-        // Step 2: Insert the students into the 'students' table.
-        // The "ON CONFLICT (reg_no) DO NOTHING" clause prevents errors if a student already exists.
+        // Hash the group password
+        const salt = await bcrypt.genSalt(10);
+        const password_hash = await bcrypt.hash(password, salt);
+
+        // Insert the students into the 'students' table.
         for (const member of members) {
-            const { name, reg_no, cgpa } = member;
-            const studentInsertQuery = 'INSERT INTO students (reg_no, name, cgpa) VALUES ($1, $2, $3) ON CONFLICT (reg_no) DO NOTHING';
-            await db.query(studentInsertQuery, [reg_no, name, cgpa]);
+            const { name, reg_no, cgpa, email } = member;
+            const studentInsertQuery = 'INSERT INTO students (reg_no, name, cgpa, email) VALUES ($1, $2, $3, $4) ON CONFLICT (reg_no) DO NOTHING';
+            await db.query(studentInsertQuery, [reg_no, name, cgpa, email || null]);
         }
 
-        // Step 3: Insert the new group into the 'project_groups' table and get the new group's ID.
-        const groupInsertQuery = 'INSERT INTO project_groups (group_name) VALUES ($1) RETURNING group_id';
-        const newGroup = await db.query(groupInsertQuery, [group_name]);
+        // Insert the new group with password hash
+        const groupInsertQuery = 'INSERT INTO project_groups (group_name, password_hash) VALUES ($1, $2) RETURNING group_id';
+        const newGroup = await db.query(groupInsertQuery, [group_name, password_hash]);
         const groupId = newGroup.rows[0].group_id;
 
-        // Step 4: Link the members to the newly created group in the 'group_members' junction table.
+        // Link the members to the group
         for (const member of members) {
             const memberInsertQuery = 'INSERT INTO group_members (group_id, student_reg_no) VALUES ($1, $2)';
             await db.query(memberInsertQuery, [groupId, member.reg_no]);
         }
-        
-        // Step 5: Create initial (empty) mark entries for each student in the new group.
+
+        // Create initial mark entries
         for (const member of members) {
             const marksInsertQuery = 'INSERT INTO marks (student_reg_no, group_id) VALUES ($1, $2)';
             await db.query(marksInsertQuery, [member.reg_no, groupId]);
@@ -57,5 +66,55 @@ router.post('/register', async (req, res) => {
     }
 });
 
-module.exports = router;
+// Endpoint: POST /api/groups/login
+// Purpose: Authenticate a group using group name and password, return group details.
+router.post('/login', async (req, res) => {
+    const { group_name, password } = req.body;
 
+    if (!group_name || !password) {
+        return res.status(400).json({ msg: 'Please provide group name and password.' });
+    }
+
+    try {
+        // Find the group
+        const groupResult = await db.query(
+            'SELECT group_id, group_name, password_hash, assigned_supervisor_id FROM project_groups WHERE group_name = $1',
+            [group_name]
+        );
+
+        if (groupResult.rows.length === 0) {
+            return res.status(400).json({ msg: 'Invalid group name or password.' });
+        }
+
+        const group = groupResult.rows[0];
+
+        // Compare password
+        const isMatch = await bcrypt.compare(password, group.password_hash);
+        if (!isMatch) {
+            return res.status(400).json({ msg: 'Invalid group name or password.' });
+        }
+
+        // Get group members with their details and marks
+        const membersResult = await db.query(
+            `SELECT s.reg_no, s.name, s.cgpa, s.email, 
+                    m.review1_marks, m.review2_marks, m.review3_marks, m.review4_marks
+             FROM students s
+             JOIN group_members gm ON s.reg_no = gm.student_reg_no
+             LEFT JOIN marks m ON s.reg_no = m.student_reg_no AND gm.group_id = m.group_id
+             WHERE gm.group_id = $1`,
+            [group.group_id]
+        );
+
+        res.json({
+            group_id: group.group_id,
+            group_name: group.group_name,
+            members: membersResult.rows
+        });
+
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
+    }
+});
+
+module.exports = router;

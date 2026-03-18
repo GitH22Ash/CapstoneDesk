@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { API } from '../api';
 
+// Simple eye icon SVG components
 const EyeIcon = () => (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
@@ -17,34 +18,7 @@ const EyeOffIcon = () => (
     </svg>
 );
 
-const EyeToggle = ({ show, onToggle, id }) => (
-    <button
-        type="button"
-        onClick={onToggle}
-        title={show ? 'Hide password' : 'Show password'}
-        id={id}
-        style={{
-            position: 'absolute',
-            right: '1rem',
-            top: '50%',
-            transform: 'translateY(-50%)',
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            color: 'var(--text-muted)',
-            display: 'flex',
-            alignItems: 'center',
-            padding: '0',
-            transition: 'color 0.2s ease',
-        }}
-        onMouseEnter={e => e.currentTarget.style.color = 'var(--text-primary)'}
-        onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
-    >
-        {show ? <EyeOffIcon /> : <EyeIcon />}
-    </button>
-);
-
-function SupervisorLogin() {
+function AdminLogin() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -63,13 +37,9 @@ function SupervisorLogin() {
 
         try {
             setLoading(true);
-            const res = await API.post('/supervisors/login', {
-                email,
-                password,
-            });
-
-            localStorage.setItem('token', res.data.token);
-            navigate('/supervisor/dashboard');
+            const res = await API.post('/admin/login', { email, password });
+            localStorage.setItem('adminToken', res.data.token);
+            navigate('/admin/panel');
         } catch (err) {
             setError(err.response?.data?.msg || 'Login failed. Please try again.');
         } finally {
@@ -80,7 +50,7 @@ function SupervisorLogin() {
     return (
         <div className="page-container">
             <div className="bg-grid" />
-            <div className="bg-glow" style={{ top: '-200px', right: '-100px', background: 'rgba(139,92,246,0.3)' }} />
+            <div className="bg-glow" style={{ top: '-200px', left: '50%', transform: 'translateX(-50%)', background: 'rgba(245,158,11,0.25)' }} />
 
             <div className="page-content" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
                 <Link to="/" className="back-link animate-fade-in">
@@ -93,28 +63,28 @@ function SupervisorLogin() {
                         fontWeight: 700,
                         textAlign: 'center',
                         marginBottom: '0.5rem',
-                        background: 'linear-gradient(135deg, #8b5cf6, #d946ef)',
+                        background: 'linear-gradient(135deg, #f59e0b, #f43f5e)',
                         WebkitBackgroundClip: 'text',
                         WebkitTextFillColor: 'transparent',
                     }}>
-                        👨‍🏫 Supervisor Portal
+                        🛡️ Admin Portal
                     </h2>
                     <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginBottom: '2rem', fontSize: '0.9rem' }}>
-                        Login with your supervisor credentials
+                        Enter your admin credentials to continue
                     </p>
 
                     {error && <div className="alert alert-error" style={{ marginBottom: '1.5rem' }}>{error}</div>}
 
                     <form onSubmit={handleSubmit}>
                         <div style={{ marginBottom: '1.25rem' }}>
-                            <label className="form-label">Email / Employee ID</label>
+                            <label className="form-label">Email</label>
                             <input
-                                type="text"
+                                type="email"
                                 className="form-input"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                placeholder="Enter your email"
-                                id="supervisor-email"
+                                placeholder="admin@example.com"
+                                id="admin-email"
                             />
                         </div>
 
@@ -126,15 +96,34 @@ function SupervisorLogin() {
                                     className="form-input"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    placeholder="Enter your password"
-                                    id="supervisor-password"
+                                    placeholder="Enter password"
+                                    id="admin-password"
                                     style={{ paddingRight: '3rem' }}
                                 />
-                                <EyeToggle
-                                    show={showPassword}
-                                    onToggle={() => setShowPassword(prev => !prev)}
-                                    id="supervisor-password-toggle"
-                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(prev => !prev)}
+                                    title={showPassword ? 'Hide password' : 'Show password'}
+                                    style={{
+                                        position: 'absolute',
+                                        right: '1rem',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'none',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        color: 'var(--text-muted)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        padding: '0',
+                                        transition: 'color 0.2s ease',
+                                    }}
+                                    onMouseEnter={e => e.currentTarget.style.color = 'var(--text-primary)'}
+                                    onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+                                    id="admin-password-toggle"
+                                >
+                                    {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+                                </button>
                             </div>
                         </div>
 
@@ -142,23 +131,19 @@ function SupervisorLogin() {
                             type="submit"
                             className="btn-primary"
                             disabled={loading}
-                            id="supervisor-login-btn"
+                            id="admin-login-btn"
                             style={{
                                 marginTop: '0.5rem',
-                                background: 'linear-gradient(135deg, #8b5cf6, #d946ef)',
+                                background: 'linear-gradient(135deg, #f59e0b, #f43f5e)',
                             }}
                         >
-                            {loading ? 'Logging in...' : 'Login'}
+                            {loading ? 'Authenticating...' : 'Login as Admin'}
                         </button>
                     </form>
-
-                    <p style={{ textAlign: 'center', marginTop: '1.5rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                        Supervisor accounts are created by the admin.
-                    </p>
                 </div>
             </div>
         </div>
     );
 }
 
-export default SupervisorLogin;
+export default AdminLogin;

@@ -15,12 +15,14 @@ CREATE TABLE supervisors (
 CREATE TABLE students (
     reg_no VARCHAR(50) PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
-    cgpa NUMERIC(4, 2) NOT NULL
+    cgpa NUMERIC(4, 2) NOT NULL,
+    email VARCHAR(100)
 );
 
 CREATE TABLE project_groups (
     group_id SERIAL PRIMARY KEY,
     group_name VARCHAR(100) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
     assigned_supervisor_id VARCHAR(50),
     FOREIGN KEY (assigned_supervisor_id) REFERENCES supervisors(emp_id) ON DELETE SET NULL
 );
