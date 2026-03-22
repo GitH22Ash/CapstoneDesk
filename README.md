@@ -85,7 +85,7 @@ Make sure you have installed:
 
 #### 1️⃣ Clone the Repository 📂
 ```bash
-https://github.com/GitH22Ash/CapstoneDesk.git
+git clone https://github.com/GitH22Ash/CapstoneDesk.git
 cd CapstoneDesk
 ```
 
