@@ -85,8 +85,8 @@ Make sure you have installed:
 
 #### 1️⃣ Clone the Repository 📂
 ```bash
-git clone https://github.com/GitH22Ash/Allotment_Tracker.git
-cd Allotment_Tracker
+https://github.com/GitH22Ash/CapstoneDesk.git
+cd CapstoneDesk
 ```
 
 ---
