@@ -170,4 +170,6 @@ The project leverages a heavily customized **Glassmorphism design language**, em
 Contributions are always welcome! Please create a pull request with detailed commit references describing your changes.
 
 ## 📄 License
-This project is licensed under the MIT License.
+**Copyright (c) 2026. All Rights Reserved.**
+
+This project is proprietary and confidential. No part of this software may be copied, distributed, or modified without explicit written permission from the owner. See the `LICENSE` file for more details.
