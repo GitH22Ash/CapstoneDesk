@@ -20,8 +20,8 @@ Whether it’s fixing bugs 🐛, improving documentation 📚, or adding new fea
 1. **Fork the repository** 🍴
   
    ```bash
-   git clone https://github.com/YOUR-USERNAME/Allotment_Tracker.git
-   cd Allotment_Tracker
+   git clone https://github.com/GitH22Ash/CapstoneDesk.git
+   cd CapstoneDesk
    ```
 
 2. **Create a new branch** 🌿  
