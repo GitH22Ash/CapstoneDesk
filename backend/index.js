@@ -1,6 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const http = require('http');
+const { Server } = require('socket.io');
 const Sentry = require('@sentry/node');
 const db = require('./db'); // Ensure db is imported to initialize the pool
 
@@ -11,7 +13,20 @@ Sentry.init({
 });
 
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
+
+// ── Socket.IO ──
+const io = new Server(server, {
+    cors: {
+        origin: '*',
+        methods: ['GET', 'POST'],
+    },
+});
+
+// Setup video call signaling
+const { setupSocketIO } = require('./routes/videoCall');
+setupSocketIO(io);
 
 // Middleware
 app.use(cors());
@@ -22,16 +37,19 @@ app.use(express.json()); // This allows the server to accept JSON in the request
 const groupRoutes = require('./routes/groups');
 const supervisorRoutes = require('./routes/supervisors');
 const adminRoutes = require('./routes/admin');
+const chatbotRoutes = require('./routes/chatbot');
+const submissionRoutes = require('./routes/submissions');
+const { router: videoCallRoutes } = require('./routes/videoCall');
+const summarizerRoutes = require('./routes/summarizer');
 
 // Use the routes
-// Any request starting with /api/groups will be handled by groupRoutes
-app.use('/api/groups', groupRoutes); 
-
-// Any request starting with /api/supervisors will be handled by supervisorRoutes
+app.use('/api/groups', groupRoutes);
 app.use('/api/supervisors', supervisorRoutes);
-
-// Any request starting with /api/admin will be handled by adminRoutes
 app.use('/api/admin', adminRoutes);
+app.use('/api/chatbot', chatbotRoutes);
+app.use('/api/submissions', submissionRoutes);
+app.use('/api/video', videoCallRoutes);
+app.use('/api/summarizer', summarizerRoutes);
 
 // Health check endpoint for UptimeRobot monitoring
 app.get('/api/health', (req, res) => {
@@ -41,6 +59,6 @@ app.get('/api/health', (req, res) => {
 // Sentry error handler — must be after all routes and before any other error handlers
 Sentry.setupExpressErrorHandler(app);
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`Server started on port ${PORT}`);
 });

@@ -157,4 +157,44 @@ router.put('/marks', auth, async (req, res) => {
     }
 });
 
+// @route   PUT api/supervisors/change-password
+// @desc    Change supervisor's password
+// @access  Private
+router.put('/change-password', auth, async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+    const supervisorId = req.supervisor.id;
+
+    if (!currentPassword || !newPassword) {
+        return res.status(400).json({ msg: 'Please provide current and new password.' });
+    }
+
+    if (newPassword.length < 6) {
+        return res.status(400).json({ msg: 'New password must be at least 6 characters.' });
+    }
+
+    try {
+        // Get current password hash
+        const result = await db.query('SELECT password_hash FROM supervisors WHERE emp_id = $1', [supervisorId]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ msg: 'Supervisor not found.' });
+        }
+
+        // Verify current password
+        const isMatch = await bcrypt.compare(currentPassword, result.rows[0].password_hash);
+        if (!isMatch) {
+            return res.status(400).json({ msg: 'Current password is incorrect.' });
+        }
+
+        // Hash new password
+        const salt = await bcrypt.genSalt(10);
+        const newHash = await bcrypt.hash(newPassword, salt);
+
+        await db.query('UPDATE supervisors SET password_hash = $1 WHERE emp_id = $2', [newHash, supervisorId]);
+        res.json({ msg: 'Password changed successfully!' });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+});
+
 module.exports = router;
