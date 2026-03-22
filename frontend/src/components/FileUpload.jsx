@@ -11,6 +11,7 @@ function FileUpload({ groupId, uploadedBy }) {
     const fileInputRef = useRef(null);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/exhaustive-deps
         fetchSubmissions();
     }, [groupId]);
 

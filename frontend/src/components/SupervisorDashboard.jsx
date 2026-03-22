@@ -7,7 +7,6 @@ function SupervisorDashboard() {
     const [groups, setGroups] = useState([]);
     const [expandedGroup, setExpandedGroup] = useState(null);
     const [maxGroups, setMaxGroups] = useState(5);
-    const [showPreferences, setShowPreferences] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
@@ -51,7 +50,7 @@ function SupervisorDashboard() {
                 try {
                     const payload = JSON.parse(atob(token.split('.')[1]));
                     setSupervisorId(payload.supervisor?.id || '');
-                } catch (e) { /* ignore */ }
+                } catch (e) { console.error('Token parse warning:', e); }
             } catch (err) {
                 console.error("Error fetching dashboard data:", err);
                 setError('Failed to load dashboard data. Please log in again.');
@@ -82,7 +81,6 @@ function SupervisorDashboard() {
             setLoading(true);
             await API.put('/supervisors/preferences', { max_groups: maxGroups });
             setSuccess('Preferences updated successfully!');
-            setShowPreferences(false);
             setTimeout(() => setSuccess(''), 3000);
         } catch (err) {
             setError(err.response?.data?.msg || 'Failed to update preferences.');

@@ -129,7 +129,7 @@ function VideoCall({ groupId, supervisorId, isSuper = false, onClose }) {
                 socket.emit('join-room', currentRoomId);
             });
 
-            socket.on('user-joined', async (userId) => {
+            socket.on('user-joined', async () => {
                 const pc = createPeerConnection(socket, currentRoomId, stream);
                 const offer = await pc.createOffer();
                 await pc.setLocalDescription(offer);
@@ -166,6 +166,7 @@ function VideoCall({ groupId, supervisorId, isSuper = false, onClose }) {
         }
     };
 
+    // eslint-disable-next-line no-unused-vars
     const joinRoom = async (existingRoomId) => {
         setStatus('connecting');
         setRoomId(existingRoomId);

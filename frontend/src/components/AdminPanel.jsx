@@ -50,6 +50,7 @@ function AdminPanel() {
             const response = await API.get('/admin/supervisors');
             setSupervisors(response.data);
         } catch (err) {
+            console.error('Fetch supervisors error:', err);
             setError('Failed to fetch supervisors');
         } finally {
             setLoading(false);
@@ -62,6 +63,7 @@ function AdminPanel() {
             const response = await API.get('/admin/groups');
             setGroups(response.data);
         } catch (err) {
+            console.error('Fetch groups error:', err);
             setError('Failed to fetch groups');
         } finally {
             setLoading(false);
