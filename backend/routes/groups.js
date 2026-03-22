@@ -108,6 +108,7 @@ router.post('/login', async (req, res) => {
         res.json({
             group_id: group.group_id,
             group_name: group.group_name,
+            assigned_supervisor_id: group.assigned_supervisor_id || null,
             members: membersResult.rows
         });
 

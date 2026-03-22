@@ -12,13 +12,20 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@sentry/node": "^10.44.0",
     "bcryptjs": "^3.0.2",
+    "cloudinary": "^2.9.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
+    "express-rate-limit": "^8.3.1",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^2.1.1",
     "nodemon": "^3.1.10",
-    "pg": "^8.16.3"
+    "pdf-parse": "^2.4.5",
+    "pg": "^8.16.3",
+    "socket.io": "^4.8.3",
+    "xlsx": "^0.18.5"
   }
 }

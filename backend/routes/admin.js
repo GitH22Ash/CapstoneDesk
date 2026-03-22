@@ -246,4 +246,187 @@ router.post('/assign-groups', async (req, res) => {
     }
 });
 
+// Endpoint: DELETE /api/admin/supervisors/:empId
+// Purpose: Delete a supervisor and unassign all their groups
+router.delete('/supervisors/:empId', async (req, res) => {
+    const { empId } = req.params;
+
+    try {
+        // Check supervisor exists
+        const check = await db.query('SELECT emp_id FROM supervisors WHERE emp_id = $1', [empId]);
+        if (check.rows.length === 0) {
+            return res.status(404).json({ msg: 'Supervisor not found.' });
+        }
+
+        // Unassign all groups from this supervisor
+        await db.query('UPDATE project_groups SET assigned_supervisor_id = NULL WHERE assigned_supervisor_id = $1', [empId]);
+
+        // Delete supervisor
+        await db.query('DELETE FROM supervisors WHERE emp_id = $1', [empId]);
+
+        res.json({ msg: 'Supervisor deleted successfully.' });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
+    }
+});
+
+// Endpoint: DELETE /api/admin/groups/:groupId
+// Purpose: Delete a group and all its associated data (members, marks, submissions)
+router.delete('/groups/:groupId', async (req, res) => {
+    const { groupId } = req.params;
+
+    try {
+        const check = await db.query('SELECT group_id FROM project_groups WHERE group_id = $1', [groupId]);
+        if (check.rows.length === 0) {
+            return res.status(404).json({ msg: 'Group not found.' });
+        }
+
+        // CASCADE will handle group_members, marks, submissions
+        await db.query('DELETE FROM project_groups WHERE group_id = $1', [groupId]);
+
+        res.json({ msg: 'Group and all associated data deleted successfully.' });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
+    }
+});
+
+// Endpoint: POST /api/admin/upload-students
+// Purpose: Upload an Excel file with student data for bulk import
+const multer = require('multer');
+const XLSX = require('xlsx');
+const excelUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        const allowed = [
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-excel',
+        ];
+        if (allowed.includes(file.mimetype)) cb(null, true);
+        else cb(new Error('Only Excel files (.xlsx, .xls) are allowed.'), false);
+    },
+});
+
+router.post('/upload-students', excelUpload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ msg: 'No file uploaded.' });
+        }
+
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+
+        if (data.length === 0) {
+            return res.status(400).json({ msg: 'Excel file is empty.' });
+        }
+
+        let inserted = 0;
+        let skipped = 0;
+        const errors = [];
+
+        for (let i = 0; i < data.length; i++) {
+            const row = data[i];
+            const reg_no = row.reg_no || row.registration_number || row.Registration_Number || row.RegNo;
+            const name = row.name || row.Name || row.student_name;
+            const cgpa = parseFloat(row.cgpa || row.CGPA || 0);
+            const email = row.email || row.Email || null;
+
+            if (!reg_no || !name) {
+                errors.push(`Row ${i + 2}: Missing reg_no or name.`);
+                skipped++;
+                continue;
+            }
+
+            try {
+                await db.query(
+                    'INSERT INTO students (reg_no, name, cgpa, email) VALUES ($1, $2, $3, $4) ON CONFLICT (reg_no) DO NOTHING',
+                    [reg_no, name, cgpa, email]
+                );
+                inserted++;
+            } catch (e) {
+                errors.push(`Row ${i + 2}: ${e.message}`);
+                skipped++;
+            }
+        }
+
+        res.json({
+            msg: `Imported ${inserted} students. ${skipped} skipped.`,
+            errors: errors.length > 0 ? errors.slice(0, 10) : undefined,
+        });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ msg: 'Failed to process Excel file.' });
+    }
+});
+
+// Endpoint: POST /api/admin/upload-supervisors
+// Purpose: Upload an Excel file with supervisor data for bulk import
+router.post('/upload-supervisors', excelUpload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ msg: 'No file uploaded.' });
+        }
+
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+
+        if (data.length === 0) {
+            return res.status(400).json({ msg: 'Excel file is empty.' });
+        }
+
+        let inserted = 0;
+        let skipped = 0;
+        const errors = [];
+
+        for (let i = 0; i < data.length; i++) {
+            const row = data[i];
+            const emp_id = row.emp_id || row.Employee_ID || row.EmployeeID || row.EmpId;
+            const name = row.name || row.Name || row.supervisor_name;
+            const email = row.email || row.Email;
+            const password = row.password || row.Password || 'default123';
+
+            if (!emp_id || !name || !email) {
+                errors.push(`Row ${i + 2}: Missing emp_id, name, or email.`);
+                skipped++;
+                continue;
+            }
+
+            try {
+                const existing = await db.query(
+                    'SELECT emp_id FROM supervisors WHERE email = $1 OR emp_id = $2',
+                    [email, emp_id]
+                );
+                if (existing.rows.length > 0) {
+                    skipped++;
+                    continue;
+                }
+
+                const salt = await bcrypt.genSalt(10);
+                const password_hash = await bcrypt.hash(password, salt);
+
+                await db.query(
+                    'INSERT INTO supervisors (emp_id, name, email, password_hash) VALUES ($1, $2, $3, $4)',
+                    [emp_id, name, email, password_hash]
+                );
+                inserted++;
+            } catch (e) {
+                errors.push(`Row ${i + 2}: ${e.message}`);
+                skipped++;
+            }
+        }
+
+        res.json({
+            msg: `Imported ${inserted} supervisors. ${skipped} skipped.`,
+            errors: errors.length > 0 ? errors.slice(0, 10) : undefined,
+        });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ msg: 'Failed to process Excel file.' });
+    }
+});
+
 module.exports = router;

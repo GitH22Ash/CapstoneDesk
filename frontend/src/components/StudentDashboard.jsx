@@ -1,8 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import AIChatbot from './AIChatbot';
+import FileUpload from './FileUpload';
+import VideoCall from './VideoCall';
 
 function StudentDashboard() {
     const [groupData, setGroupData] = useState(null);
+    const [activeTab, setActiveTab] = useState('members');
+    const [showVideoCall, setShowVideoCall] = useState(false);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -21,12 +26,17 @@ function StudentDashboard() {
 
     if (!groupData) return null;
 
+    const tabs = [
+        { key: 'members', label: '👥 Members', desc: 'View group members & marks' },
+        { key: 'submissions', label: '📁 Submissions', desc: 'Upload & manage files' },
+    ];
+
     return (
         <div className="page-container">
             <div className="bg-grid" />
             <div className="bg-glow" style={{ top: '-200px', right: '-100px', background: 'rgba(59,130,246,0.25)' }} />
 
-            <div className="page-content" style={{ maxWidth: '900px', margin: '0 auto' }}>
+            <div className="page-content" style={{ maxWidth: '960px', margin: '0 auto' }}>
                 {/* Top bar */}
                 <div style={{
                     display: 'flex',
@@ -37,13 +47,25 @@ function StudentDashboard() {
                     <Link to="/" className="back-link" style={{ marginBottom: 0 }}>
                         ← Home
                     </Link>
-                    <button className="logout-btn" onClick={handleLogout} id="student-logout-btn">
-                        Logout
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.75rem' }}>
+                        {groupData.assigned_supervisor_id && (
+                            <button
+                                className="btn-success"
+                                onClick={() => setShowVideoCall(true)}
+                                style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+                                id="video-call-btn"
+                            >
+                                📞 Call Supervisor
+                            </button>
+                        )}
+                        <button className="logout-btn" onClick={handleLogout} id="student-logout-btn">
+                            Logout
+                        </button>
+                    </div>
                 </div>
 
                 {/* Header */}
-                <div className="animate-fade-in-up" style={{ marginBottom: '2.5rem' }}>
+                <div className="animate-fade-in-up" style={{ marginBottom: '2rem' }}>
                     <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.4rem' }}>
                         Group Dashboard
                     </p>
@@ -58,70 +80,118 @@ function StudentDashboard() {
                     </h1>
                 </div>
 
-                {/* Members */}
-                <div style={{ display: 'grid', gap: '1rem' }}>
-                    {groupData.members.map((member, index) => (
-                        <div
-                            key={member.reg_no}
-                            className={`glass-card animate-fade-in-up delay-${index + 1}`}
-                            style={{ padding: '1.5rem' }}
+                {/* Tab Navigation */}
+                <div style={{
+                    display: 'flex', gap: '0.5rem', marginBottom: '1.5rem',
+                    borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.75rem',
+                }}>
+                    {tabs.map(tab => (
+                        <button
+                            key={tab.key}
+                            onClick={() => setActiveTab(tab.key)}
+                            id={`tab-${tab.key}`}
+                            style={{
+                                padding: '0.6rem 1.25rem', borderRadius: '10px',
+                                background: activeTab === tab.key ? 'rgba(59,130,246,0.15)' : 'transparent',
+                                border: activeTab === tab.key ? '1px solid rgba(59,130,246,0.3)' : '1px solid transparent',
+                                color: activeTab === tab.key ? '#60a5fa' : 'var(--text-muted)',
+                                cursor: 'pointer', fontSize: '0.88rem', fontWeight: 600,
+                                transition: 'all 0.2s',
+                            }}
                         >
-                            <div style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'flex-start',
-                                flexWrap: 'wrap',
-                                gap: '1rem',
-                            }}>
-                                <div>
-                                    <h3 style={{ fontSize: '1.15rem', fontWeight: 600, marginBottom: '0.25rem' }}>
-                                        {member.name}
-                                    </h3>
-                                    <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                                        {member.reg_no}
-                                    </p>
-                                </div>
-                                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                                    <div style={{ textAlign: 'center' }}>
-                                        <p style={{ color: 'var(--text-muted)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>CGPA</p>
-                                        <p style={{ fontWeight: 600, color: 'var(--accent-emerald)' }}>{member.cgpa}</p>
-                                    </div>
-                                    <div style={{ textAlign: 'center' }}>
-                                        <p style={{ color: 'var(--text-muted)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email</p>
-                                        <p style={{ fontWeight: 500, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{member.email || '—'}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Review Marks */}
-                            <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))',
-                                gap: '0.75rem',
-                                marginTop: '1rem',
-                                paddingTop: '1rem',
-                                borderTop: '1px solid var(--border-glass)',
-                            }}>
-                                {[1, 2, 3, 4].map(r => (
-                                    <div key={r} style={{
-                                        textAlign: 'center',
-                                        background: 'rgba(255,255,255,0.03)',
-                                        padding: '0.5rem',
-                                        borderRadius: '8px',
-                                    }}>
-                                        <p style={{ color: 'var(--text-muted)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>
-                                            Review {r}
-                                        </p>
-                                        <p style={{ fontWeight: 600, fontSize: '1.1rem', color: member[`review${r}_marks`] ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                                            {member[`review${r}_marks`] ?? '—'}
-                                        </p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
+                            {tab.label}
+                        </button>
                     ))}
                 </div>
+
+                {/* Members Tab */}
+                {activeTab === 'members' && (
+                    <div style={{ display: 'grid', gap: '1rem' }}>
+                        {groupData.members.map((member, index) => (
+                            <div
+                                key={member.reg_no}
+                                className={`glass-card animate-fade-in-up delay-${index + 1}`}
+                                style={{ padding: '1.5rem' }}
+                            >
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'flex-start',
+                                    flexWrap: 'wrap',
+                                    gap: '1rem',
+                                }}>
+                                    <div>
+                                        <h3 style={{ fontSize: '1.15rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                                            {member.name}
+                                        </h3>
+                                        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                            {member.reg_no}
+                                        </p>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                                        <div style={{ textAlign: 'center' }}>
+                                            <p style={{ color: 'var(--text-muted)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>CGPA</p>
+                                            <p style={{ fontWeight: 600, color: 'var(--accent-emerald)' }}>{member.cgpa}</p>
+                                        </div>
+                                        <div style={{ textAlign: 'center' }}>
+                                            <p style={{ color: 'var(--text-muted)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email</p>
+                                            <p style={{ fontWeight: 500, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{member.email || '—'}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Review Marks */}
+                                <div style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))',
+                                    gap: '0.75rem',
+                                    marginTop: '1rem',
+                                    paddingTop: '1rem',
+                                    borderTop: '1px solid var(--border-glass)',
+                                }}>
+                                    {[1, 2, 3, 4].map(r => (
+                                        <div key={r} style={{
+                                            textAlign: 'center',
+                                            background: 'rgba(255,255,255,0.03)',
+                                            padding: '0.5rem',
+                                            borderRadius: '8px',
+                                        }}>
+                                            <p style={{ color: 'var(--text-muted)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>
+                                                Review {r}
+                                            </p>
+                                            <p style={{ fontWeight: 600, fontSize: '1.1rem', color: member[`review${r}_marks`] ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                                                {member[`review${r}_marks`] ?? '—'}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Submissions Tab */}
+                {activeTab === 'submissions' && (
+                    <div className="glass-card animate-fade-in" style={{ padding: '1.5rem' }}>
+                        <FileUpload
+                            groupId={groupData.group_id}
+                            uploadedBy={groupData.members?.[0]?.reg_no || 'unknown'}
+                        />
+                    </div>
+                )}
             </div>
+
+            {/* AI Chatbot */}
+            <AIChatbot />
+
+            {/* Video Call Modal */}
+            {showVideoCall && groupData.assigned_supervisor_id && (
+                <VideoCall
+                    groupId={groupData.group_id}
+                    supervisorId={groupData.assigned_supervisor_id}
+                    onClose={() => setShowVideoCall(false)}
+                />
+            )}
         </div>
     );
 }
