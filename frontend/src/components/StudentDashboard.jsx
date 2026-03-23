@@ -164,6 +164,27 @@ function StudentDashboard() {
                                             </p>
                                         </div>
                                     ))}
+                                    {(() => {
+                                        const hasAllMarks = [1, 2, 3, 4].every(r => member[`review${r}_marks`] !== null && member[`review${r}_marks`] !== undefined && member[`review${r}_marks`] !== '');
+                                        if (!hasAllMarks) return null;
+                                        const avg = ([1, 2, 3, 4].reduce((sum, r) => sum + Number(member[`review${r}_marks`]), 0) / 4).toFixed(2);
+                                        return (
+                                        <div style={{
+                                            textAlign: 'center',
+                                            background: 'rgba(59,130,246,0.05)',
+                                            padding: '0.5rem',
+                                            borderRadius: '8px',
+                                            border: '1px solid rgba(59,130,246,0.2)'
+                                        }}>
+                                            <p style={{ color: '#60a5fa', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>
+                                                Average
+                                            </p>
+                                            <p style={{ fontWeight: 700, fontSize: '1.2rem', color: '#60a5fa' }}>
+                                                {avg}
+                                            </p>
+                                        </div>
+                                        );
+                                    })()}
                                 </div>
                             </div>
                         ))}

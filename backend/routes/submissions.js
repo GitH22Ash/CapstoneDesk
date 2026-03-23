@@ -107,9 +107,10 @@ router.get('/supervisor', auth, async (req, res) => {
     try {
         const supervisorId = req.supervisor.id;
         const result = await db.query(
-            `SELECT s.*, pg.group_name
+            `SELECT s.*, pg.group_name, st.name as uploader_name
              FROM submissions s
              JOIN project_groups pg ON s.group_id = pg.group_id
+             LEFT JOIN students st ON s.uploaded_by = st.reg_no
              WHERE pg.assigned_supervisor_id = $1
              ORDER BY s.uploaded_at DESC`,
             [supervisorId]
@@ -118,6 +119,44 @@ router.get('/supervisor', auth, async (req, res) => {
     } catch (err) {
         console.error(err.message);
         res.status(500).json({ msg: 'Failed to fetch submissions.' });
+    }
+});
+
+// DELETE /api/submissions/:submissionId
+router.delete('/:submissionId', async (req, res) => {
+    try {
+        const { submissionId } = req.params;
+        
+        const check = await db.query('SELECT * FROM submissions WHERE submission_id = $1', [submissionId]);
+        if (check.rows.length === 0) {
+            return res.status(404).json({ msg: 'Submission not found.' });
+        }
+        
+        // Extract public_id from file_url to delete from cloudinary
+        const fileUrl = check.rows[0].file_url;
+        try {
+            const urlParts = fileUrl.split('/');
+            const uploadIndex = urlParts.findIndex(part => part === 'upload');
+            if (uploadIndex !== -1) {
+                // skip upload/vXXXXXX/ and take the rest without extension
+                const pathParts = urlParts.slice(uploadIndex + 2);
+                const pathString = pathParts.join('/');
+                const publicId = pathString.substring(0, pathString.lastIndexOf('.'));
+                
+                if (publicId) {
+                    await cloudinary.uploader.destroy(publicId, { resource_type: 'raw' });
+                }
+            }
+        } catch (cloudinaryErr) {
+            console.error('Failed to delete from Cloudinary:', cloudinaryErr.message);
+        }
+
+        await db.query('DELETE FROM submissions WHERE submission_id = $1', [submissionId]);
+        
+        res.json({ msg: 'Submission deleted successfully.' });
+    } catch (err) {
+        console.error('Delete error:', err.message);
+        res.status(500).json({ msg: 'Failed to delete submission.' });
     }
 });
 

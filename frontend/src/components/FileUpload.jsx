@@ -24,6 +24,19 @@ function FileUpload({ groupId, uploadedBy }) {
         }
     };
 
+    const handleDelete = async (submissionId) => {
+        if (!window.confirm("Are you sure you want to delete this file?")) return;
+        
+        try {
+            await API.delete(`/submissions/${submissionId}`);
+            setSuccess('File deleted successfully.');
+            fetchSubmissions();
+            setTimeout(() => setSuccess(''), 3000);
+        } catch (err) {
+            setError(err.response?.data?.msg || 'Failed to delete file.');
+        }
+    };
+
     const validateFile = (file) => {
         const allowedTypes = ['application/pdf', 'application/vnd.ms-powerpoint',
             'application/vnd.openxmlformats-officedocument.presentationml.presentation'];
@@ -205,6 +218,13 @@ function FileUpload({ groupId, uploadedBy }) {
                                     style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', textDecoration: 'none' }}>
                                     ⬇ Download
                                 </a>
+                                <button
+                                    onClick={() => handleDelete(sub.submission_id)}
+                                    className="btn-error"
+                                    style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)' }}
+                                >
+                                    🗑 Delete
+                                </button>
                             </div>
                         </div>
                     ))}

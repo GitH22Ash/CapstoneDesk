@@ -152,7 +152,13 @@ function SupervisorDashboard() {
 
     const handleInputChange = (e, groupIndex, memberIndex, reviewNumber) => {
         const newGroups = [...groups];
-        newGroups[groupIndex].members[memberIndex][`review${reviewNumber}_marks`] = e.target.value;
+        let val = e.target.value;
+        if (val !== '') {
+            val = Number(val);
+            if (val < 0) val = 0;
+            if (val > 100) val = 100;
+        }
+        newGroups[groupIndex].members[memberIndex][`review${reviewNumber}_marks`] = val;
         setGroups(newGroups);
     };
 
@@ -369,6 +375,8 @@ function SupervisorDashboard() {
                                                                     </p>
                                                                     <input
                                                                         type="number"
+                                                                        min="0"
+                                                                        max="100"
                                                                         className="form-input"
                                                                         style={{ padding: '0.5rem 0.75rem', fontSize: '0.9rem', textAlign: 'center' }}
                                                                         value={member[`review${reviewNumber}_marks`] ?? ''}
@@ -379,6 +387,21 @@ function SupervisorDashboard() {
                                                                     />
                                                                 </div>
                                                             ))}
+                                                            {(() => {
+                                                                const hasAllMarks = [1, 2, 3, 4].every(r => member[`review${r}_marks`] !== null && member[`review${r}_marks`] !== undefined && member[`review${r}_marks`] !== '');
+                                                                if (!hasAllMarks) return null;
+                                                                const avg = ([1, 2, 3, 4].reduce((sum, r) => sum + Number(member[`review${r}_marks`]), 0) / 4).toFixed(2);
+                                                                return (
+                                                                    <div>
+                                                                        <p style={{ color: 'var(--accent-emerald)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem', fontWeight: 600 }}>
+                                                                            Average
+                                                                        </p>
+                                                                        <div className="form-input" style={{ padding: '0.5rem 0.75rem', fontSize: '0.9rem', textAlign: 'center', background: 'rgba(255,255,255,0.05)', color: 'var(--text-primary)' }}>
+                                                                            {avg}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })()}
                                                         </div>
                                                     </div>
                                                 ))}
@@ -418,7 +441,7 @@ function SupervisorDashboard() {
                                             <div>
                                                 <p style={{ fontWeight: 600, fontSize: '0.9rem' }}>{sub.file_name}</p>
                                                 <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-                                                    {sub.group_name} • {formatSize(sub.file_size)} • {formatDate(sub.uploaded_at)}
+                                                    {sub.group_name} • {formatSize(sub.file_size)} • {formatDate(sub.uploaded_at)} • by {sub.uploader_name || sub.uploaded_by}
                                                 </p>
                                             </div>
                                         </div>
