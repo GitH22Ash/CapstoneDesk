@@ -40,8 +40,20 @@ function LandingPage() {
             <div className="page-content" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
                 {/* Header */}
                 <div className="animate-fade-in-up" style={{ textAlign: 'center', marginBottom: '4rem' }}>
+                    <img 
+                        src="/logo.png" 
+                        alt="CapstoneDesk Logo" 
+                        style={{ 
+                            width: '150px', 
+                            height: '110px', 
+                            marginBottom: '1rem',
+                            display: 'inline-block',
+                            objectFit: 'contain',
+                            filter: 'drop-shadow(0 0 20px rgba(6,182,212,0.4))'
+                        }} 
+                    />
                     <h1 style={{
-                        fontSize: 'clamp(2.5rem, 5vw, 4rem)',
+                        fontSize: 'clamp(2rem, 4vw, 3rem)',
                         fontWeight: 800,
                         background: 'linear-gradient(135deg, #fff 0%, #94a3b8 100%)',
                         WebkitBackgroundClip: 'text',
