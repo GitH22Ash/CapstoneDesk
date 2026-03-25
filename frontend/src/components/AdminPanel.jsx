@@ -18,6 +18,8 @@ function AdminPanel() {
     // Data states
     const [supervisors, setSupervisors] = useState([]);
     const [groups, setGroups] = useState([]);
+    const [students, setStudents] = useState([]);
+    const [unassignedStudents, setUnassignedStudents] = useState([]);
     const [selectedGroup, setSelectedGroup] = useState('');
     const [selectedSupervisor, setSelectedSupervisor] = useState('');
 
@@ -27,6 +29,11 @@ function AdminPanel() {
     // Excel upload refs
     const studentFileRef = useRef(null);
     const supervisorFileRef = useRef(null);
+
+    // Create group state
+    const [newGroupName, setNewGroupName] = useState('');
+    const [newGroupPassword, setNewGroupPassword] = useState('');
+    const [selectedStudents, setSelectedStudents] = useState([]);
 
     useEffect(() => {
         const token = localStorage.getItem('adminToken');
@@ -41,7 +48,8 @@ function AdminPanel() {
         else if (activeTab === 'assign') {
             fetchGroups();
             fetchSupervisors();
-        }
+        } else if (activeTab === 'students') fetchStudents();
+        else if (activeTab === 'createGroups') fetchUnassignedStudents();
     }, [activeTab]);
 
     const fetchSupervisors = async () => {
@@ -65,6 +73,33 @@ function AdminPanel() {
         } catch (err) {
             console.error('Fetch groups error:', err);
             setError('Failed to fetch groups');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchStudents = async () => {
+        try {
+            setLoading(true);
+            const response = await API.get('/admin/students');
+            setStudents(response.data);
+        } catch (err) {
+            console.error('Fetch students error:', err);
+            setError('Failed to fetch students');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchUnassignedStudents = async () => {
+        try {
+            setLoading(true);
+            const response = await API.get('/admin/unassigned-students');
+            setUnassignedStudents(response.data);
+            setSelectedStudents([]);
+        } catch (err) {
+            console.error('Fetch unassigned students error:', err);
+            setError('Failed to fetch unassigned students');
         } finally {
             setLoading(false);
         }
@@ -169,6 +204,90 @@ function AdminPanel() {
         }
     };
 
+    const handleDeleteStudent = async (regNo) => {
+        setError(''); setMessage('');
+        try {
+            setLoading(true);
+            await API.delete(`/admin/students/${regNo}`);
+            setMessage('Student deleted successfully!');
+            setDeleteModal(null);
+            fetchStudents();
+        } catch (err) {
+            setError(err.response?.data?.msg || 'Failed to delete student.');
+            setDeleteModal(null);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleRemoveFromGroup = async (groupId, regNo) => {
+        setError(''); setMessage('');
+        try {
+            setLoading(true);
+            await API.delete(`/admin/groups/${groupId}/members/${regNo}`);
+            setMessage('Student removed from group successfully!');
+            setDeleteModal(null);
+            fetchStudents();
+        } catch (err) {
+            setError(err.response?.data?.msg || 'Failed to remove student from group.');
+            setDeleteModal(null);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Create group handlers
+    const handleCreateGroup = async () => {
+        setError(''); setMessage('');
+        if (!newGroupName || !newGroupPassword || selectedStudents.length === 0) {
+            setError('Please provide group name, password, and select at least one student.');
+            return;
+        }
+        if (selectedStudents.length > 5) {
+            setError('A group can have at most 5 members.');
+            return;
+        }
+        try {
+            setLoading(true);
+            const res = await API.post('/admin/create-group', {
+                group_name: newGroupName,
+                password: newGroupPassword,
+                student_reg_nos: selectedStudents,
+            });
+            setMessage(res.data.msg);
+            setNewGroupName(''); setNewGroupPassword(''); setSelectedStudents([]);
+            fetchUnassignedStudents();
+        } catch (err) {
+            setError(err.response?.data?.msg || 'Failed to create group.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleAutoCreateGroups = async () => {
+        setError(''); setMessage('');
+        try {
+            setLoading(true);
+            const res = await API.post('/admin/auto-create-groups');
+            setMessage(res.data.msg);
+            fetchUnassignedStudents();
+        } catch (err) {
+            setError(err.response?.data?.msg || 'Failed to auto-create groups.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const toggleStudentSelection = (regNo) => {
+        setSelectedStudents(prev =>
+            prev.includes(regNo)
+                ? prev.filter(r => r !== regNo)
+                : prev.length < 5
+                    ? [...prev, regNo]
+                    : prev
+        );
+    };
+
     // Excel upload handlers
     const handleExcelUpload = async (type, file) => {
         if (!file) return;
@@ -202,7 +321,9 @@ function AdminPanel() {
     const panels = [
         { key: 'create', icon: '➕', title: 'Create Supervisor', desc: 'Add new supervisor accounts', gradient: 'linear-gradient(135deg, #3b82f6, #06b6d4)' },
         { key: 'supervisors', icon: '👥', title: 'View Supervisors', desc: 'Manage all supervisors', gradient: 'linear-gradient(135deg, #8b5cf6, #d946ef)' },
+        { key: 'students', icon: '🎓', title: 'View Students', desc: 'Manage all student records', gradient: 'linear-gradient(135deg, #f59e0b, #ef4444)' },
         { key: 'groups', icon: '📋', title: 'View Groups', desc: 'Manage all student groups', gradient: 'linear-gradient(135deg, #10b981, #059669)' },
+        { key: 'createGroups', icon: '🏗', title: 'Create Groups', desc: 'Form new student groups', gradient: 'linear-gradient(135deg, #ec4899, #8b5cf6)' },
         { key: 'assign', icon: '🔗', title: 'Group Assignment', desc: 'Assign groups to supervisors', gradient: 'linear-gradient(135deg, #f59e0b, #f43f5e)' },
         { key: 'import', icon: '📥', title: 'Bulk Import', desc: 'Upload Excel sheets', gradient: 'linear-gradient(135deg, #06b6d4, #3b82f6)' },
     ];
@@ -229,7 +350,7 @@ function AdminPanel() {
                         WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
                         marginBottom: '0.5rem',
                     }}>Admin Panel</h1>
-                    <p style={{ color: 'var(--text-muted)' }}>Manage supervisors, groups, and assignments</p>
+                    <p style={{ color: 'var(--text-muted)' }}>Manage supervisors, groups, students, and assignments</p>
                 </div>
 
                 {/* Alerts */}
@@ -339,6 +460,75 @@ function AdminPanel() {
                     </div>
                 )}
 
+                {/* ── View Students ── */}
+                {activeTab === 'students' && (
+                    <div className="glass-card animate-fade-in" style={{ padding: '2rem', overflowX: 'auto' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                            <h2 style={{ fontSize: '1.35rem', fontWeight: 700, margin: 0 }}>All Students</h2>
+                            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{students.length} total</span>
+                        </div>
+                        {loading ? (
+                            <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '2rem' }}>Loading...</p>
+                        ) : students.length === 0 ? (
+                            <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '2rem' }}>No students registered yet.</p>
+                        ) : (
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Reg No</th>
+                                        <th>Name</th>
+                                        <th>CGPA</th>
+                                        <th>Email</th>
+                                        <th>Group Name</th>
+                                        <th>Group #</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {students.map((st) => (
+                                        <tr key={st.reg_no}>
+                                            <td style={{ fontWeight: 600 }}>{st.reg_no}</td>
+                                            <td>{st.name}</td>
+                                            <td>{st.cgpa}</td>
+                                            <td>{st.email || '—'}</td>
+                                            <td>{st.group_name || '—'}</td>
+                                            <td>{st.group_id || '—'}</td>
+                                            <td>
+                                                <span className={`badge ${st.status === 'In Group' ? 'badge-success' : 'badge-warning'}`}>
+                                                    {st.status}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                                    {st.group_id && (
+                                                        <button
+                                                            className="btn-secondary"
+                                                            onClick={() => setDeleteModal({ type: 'removeFromGroup', id: st.reg_no, groupId: st.group_id, name: st.name, groupName: st.group_name })}
+                                                            style={{ fontSize: '0.7rem', padding: '0.25rem 0.5rem' }}
+                                                            id={`remove-student-${st.reg_no}`}
+                                                        >
+                                                            ↩ Remove
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        className="btn-danger"
+                                                        onClick={() => setDeleteModal({ type: 'student', id: st.reg_no, name: st.name })}
+                                                        id={`delete-student-${st.reg_no}`}
+                                                        style={{ fontSize: '0.7rem', padding: '0.25rem 0.5rem' }}
+                                                    >
+                                                        🗑 Delete
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+                )}
+
                 {/* ── View Groups ── */}
                 {activeTab === 'groups' && (
                     <div className="glass-card animate-fade-in" style={{ padding: '2rem', overflowX: 'auto' }}>
@@ -394,6 +584,112 @@ function AdminPanel() {
                                 </tbody>
                             </table>
                         )}
+                    </div>
+                )}
+
+                {/* ── Create Groups ── */}
+                {activeTab === 'createGroups' && (
+                    <div className="animate-fade-in" style={{ display: 'grid', gap: '1.5rem' }}>
+                        {/* Manual Group Creation */}
+                        <div className="glass-card" style={{ padding: '2rem' }}>
+                            <h2 style={{ fontSize: '1.35rem', fontWeight: 700, marginBottom: '1rem' }}>Manual Group Creation</h2>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+                                Select up to 5 unassigned students and create a new group.
+                            </p>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
+                                <div>
+                                    <label className="form-label">Group Name</label>
+                                    <input type="text" className="form-input" value={newGroupName}
+                                        onChange={(e) => setNewGroupName(e.target.value)}
+                                        placeholder="e.g., Team Alpha" id="new-group-name" />
+                                </div>
+                                <div>
+                                    <label className="form-label">Group Password</label>
+                                    <input type="text" className="form-input" value={newGroupPassword}
+                                        onChange={(e) => setNewGroupPassword(e.target.value)}
+                                        placeholder="Login password for the group" id="new-group-password" />
+                                </div>
+                            </div>
+
+                            {/* Student selection */}
+                            <label className="form-label">
+                                Select Students ({selectedStudents.length}/5 selected)
+                            </label>
+                            {loading ? (
+                                <p style={{ color: 'var(--text-muted)', padding: '1rem' }}>Loading...</p>
+                            ) : unassignedStudents.length === 0 ? (
+                                <p style={{ color: 'var(--text-muted)', padding: '1rem', textAlign: 'center' }}>
+                                    No unassigned students available.
+                                </p>
+                            ) : (
+                                <div style={{
+                                    maxHeight: '280px', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.08)',
+                                    borderRadius: '12px', marginBottom: '1.25rem',
+                                }}>
+                                    {unassignedStudents.map((st) => (
+                                        <div
+                                            key={st.reg_no}
+                                            onClick={() => toggleStudentSelection(st.reg_no)}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: '0.75rem',
+                                                padding: '0.75rem 1rem', cursor: 'pointer',
+                                                background: selectedStudents.includes(st.reg_no) ? 'rgba(139,92,246,0.12)' : 'transparent',
+                                                borderBottom: '1px solid rgba(255,255,255,0.04)',
+                                                transition: 'background 0.15s',
+                                            }}
+                                            id={`select-student-${st.reg_no}`}
+                                        >
+                                            <div style={{
+                                                width: '18px', height: '18px', borderRadius: '4px',
+                                                border: selectedStudents.includes(st.reg_no) ? '2px solid #8b5cf6' : '2px solid rgba(255,255,255,0.2)',
+                                                background: selectedStudents.includes(st.reg_no) ? '#8b5cf6' : 'transparent',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                fontSize: '0.7rem', color: '#fff', flexShrink: 0,
+                                            }}>
+                                                {selectedStudents.includes(st.reg_no) && '✓'}
+                                            </div>
+                                            <div style={{ flex: 1 }}>
+                                                <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>{st.name}</span>
+                                                <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginLeft: '0.75rem' }}>
+                                                    {st.reg_no} • CGPA: {st.cgpa}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <button className="btn-primary" onClick={handleCreateGroup}
+                                disabled={loading || selectedStudents.length === 0 || !newGroupName || !newGroupPassword}
+                                id="create-group-btn">
+                                {loading ? 'Creating...' : `Create Group (${selectedStudents.length} members)`}
+                            </button>
+                        </div>
+
+                        {/* Auto Create Groups */}
+                        <div className="glass-card" style={{ padding: '2rem' }}>
+                            <h2 style={{ fontSize: '1.35rem', fontWeight: 700, marginBottom: '1rem' }}>Automatic Group Creation</h2>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1rem', lineHeight: 1.6 }}>
+                                Automatically create groups of 5 from all unassigned students. Groups will be randomly formed and named "Auto-Group-1", "Auto-Group-2", etc.
+                            </p>
+                            <div style={{
+                                background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)',
+                                borderRadius: '10px', padding: '0.875rem 1rem', marginBottom: '1.25rem',
+                                fontSize: '0.85rem', color: '#fcd34d',
+                            }}>
+                                ⚠ Default password for auto-created groups: <strong>capstone123</strong>. Students should change it after first login.
+                            </div>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1rem' }}>
+                                {unassignedStudents.length} unassigned student{unassignedStudents.length !== 1 ? 's' : ''} available
+                                ({Math.floor(unassignedStudents.length / 5)} groups can be formed)
+                            </p>
+                            <button className="btn-success" onClick={handleAutoCreateGroups}
+                                disabled={loading || unassignedStudents.length < 5}
+                                id="auto-create-groups-btn">
+                                {loading ? 'Creating Groups...' : 'Auto-Create Groups'}
+                            </button>
+                        </div>
                     </div>
                 )}
 
@@ -475,8 +771,11 @@ function AdminPanel() {
                         {/* Supervisor Excel Upload */}
                         <div className="glass-card" style={{ padding: '2rem' }}>
                             <h2 style={{ fontSize: '1.35rem', fontWeight: 700, marginBottom: '0.5rem' }}>📥 Import Supervisors</h2>
-                            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem', lineHeight: 1.6 }}>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.5rem', lineHeight: 1.6 }}>
                                 Upload an Excel file (.xlsx) with columns: <strong>emp_id</strong>, <strong>name</strong>, <strong>email</strong>, <strong>password</strong> (optional, defaults to 'default123')
+                            </p>
+                            <p style={{ color: '#fcd34d', fontSize: '0.8rem', marginBottom: '1.25rem' }}>
+                                ⚠ Duplicate supervisors (by employee ID) will be automatically skipped.
                             </p>
                             <div style={{
                                 border: '2px dashed rgba(255,255,255,0.15)', borderRadius: '14px',
@@ -517,20 +816,37 @@ function AdminPanel() {
                     >
                         <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
                         <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '0.75rem' }}>
-                            Confirm Deletion
+                            {deleteModal.type === 'removeFromGroup' ? 'Confirm Removal' : 'Confirm Deletion'}
                         </h3>
                         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: 1.6 }}>
-                            Are you sure you want to delete {deleteModal.type === 'supervisor' ? 'supervisor' : 'group'}{' '}
-                            <strong style={{ color: '#ef4444' }}>{deleteModal.name}</strong>?
-                            {deleteModal.type === 'group' && (
-                                <><br /><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                                    This will also delete all members, marks, and submissions.
-                                </span></>
-                            )}
-                            {deleteModal.type === 'supervisor' && (
-                                <><br /><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                                    All assigned groups will be unassigned.
-                                </span></>
+                            {deleteModal.type === 'removeFromGroup' ? (
+                                <>
+                                    Are you sure you want to remove <strong style={{ color: '#f59e0b' }}>{deleteModal.name}</strong> from
+                                    group <strong style={{ color: '#f59e0b' }}>{deleteModal.groupName}</strong>?
+                                    <br /><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                                        The student can be reassigned to another group later.
+                                    </span>
+                                </>
+                            ) : (
+                                <>
+                                    Are you sure you want to delete {deleteModal.type === 'supervisor' ? 'supervisor' : deleteModal.type === 'student' ? 'student' : 'group'}{' '}
+                                    <strong style={{ color: '#ef4444' }}>{deleteModal.name}</strong>?
+                                    {deleteModal.type === 'group' && (
+                                        <><br /><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                                            This will also delete all members, marks, and submissions.
+                                        </span></>
+                                    )}
+                                    {deleteModal.type === 'supervisor' && (
+                                        <><br /><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                                            All assigned groups will be unassigned.
+                                        </span></>
+                                    )}
+                                    {deleteModal.type === 'student' && (
+                                        <><br /><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                                            The student will be removed from their group and all marks will be deleted.
+                                        </span></>
+                                    )}
+                                </>
                             )}
                         </p>
                         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
@@ -543,16 +859,18 @@ function AdminPanel() {
                                 Cancel
                             </button>
                             <button
-                                className="btn-danger"
+                                className={deleteModal.type === 'removeFromGroup' ? 'btn-primary' : 'btn-danger'}
                                 onClick={() => {
                                     if (deleteModal.type === 'supervisor') handleDeleteSupervisor(deleteModal.id);
-                                    else handleDeleteGroup(deleteModal.id);
+                                    else if (deleteModal.type === 'group') handleDeleteGroup(deleteModal.id);
+                                    else if (deleteModal.type === 'student') handleDeleteStudent(deleteModal.id);
+                                    else if (deleteModal.type === 'removeFromGroup') handleRemoveFromGroup(deleteModal.groupId, deleteModal.id);
                                 }}
                                 disabled={loading}
                                 style={{ padding: '0.6rem 1.5rem' }}
                                 id="confirm-delete-btn"
                             >
-                                {loading ? 'Deleting...' : '🗑 Delete'}
+                                {loading ? 'Processing...' : deleteModal.type === 'removeFromGroup' ? '↩ Remove' : '🗑 Delete'}
                             </button>
                         </div>
                     </div>

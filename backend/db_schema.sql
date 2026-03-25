@@ -9,7 +9,7 @@ CREATE TABLE supervisors (
     name VARCHAR(100) NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    max_groups INT DEFAULT 5
+    max_groups INT DEFAULT 3
 );
 
 CREATE TABLE students (

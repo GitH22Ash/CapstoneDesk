@@ -363,7 +363,7 @@ router.post('/upload-students', excelUpload.single('file'), async (req, res) => 
 });
 
 // Endpoint: POST /api/admin/upload-supervisors
-// Purpose: Upload an Excel file with supervisor data for bulk import
+// Purpose: Upload an Excel file with supervisor data for bulk import (skips duplicates by emp_id)
 router.post('/upload-supervisors', excelUpload.single('file'), async (req, res) => {
     try {
         if (!req.file) {
@@ -396,31 +396,36 @@ router.post('/upload-supervisors', excelUpload.single('file'), async (req, res) 
             }
 
             try {
-                const existing = await db.query(
-                    'SELECT emp_id FROM supervisors WHERE email = $1 OR emp_id = $2',
-                    [email, emp_id]
-                );
-                if (existing.rows.length > 0) {
-                    skipped++;
-                    continue;
-                }
-
                 const salt = await bcrypt.genSalt(10);
                 const password_hash = await bcrypt.hash(password, salt);
 
-                await db.query(
-                    'INSERT INTO supervisors (emp_id, name, email, password_hash) VALUES ($1, $2, $3, $4)',
+                // Use ON CONFLICT to skip duplicates by emp_id (primary key)
+                const result = await db.query(
+                    `INSERT INTO supervisors (emp_id, name, email, password_hash)
+                     VALUES ($1, $2, $3, $4)
+                     ON CONFLICT (emp_id) DO NOTHING
+                     RETURNING emp_id`,
                     [emp_id, name, email, password_hash]
                 );
-                inserted++;
+
+                if (result.rows.length > 0) {
+                    inserted++;
+                } else {
+                    skipped++;
+                }
             } catch (e) {
-                errors.push(`Row ${i + 2}: ${e.message}`);
-                skipped++;
+                // Handle email unique constraint violation
+                if (e.code === '23505') {
+                    skipped++;
+                } else {
+                    errors.push(`Row ${i + 2}: ${e.message}`);
+                    skipped++;
+                }
             }
         }
 
         res.json({
-            msg: `Imported ${inserted} supervisors. ${skipped} skipped.`,
+            msg: `Imported ${inserted} supervisors. ${skipped} skipped (duplicates or errors).`,
             errors: errors.length > 0 ? errors.slice(0, 10) : undefined,
         });
     } catch (err) {
@@ -429,4 +434,236 @@ router.post('/upload-supervisors', excelUpload.single('file'), async (req, res) 
     }
 });
 
+// ═══════════════════════════════════════════════════════════
+// FEATURE 4: View All Students
+// ═══════════════════════════════════════════════════════════
+
+// Endpoint: GET /api/admin/students
+// Purpose: Get all students with their group info and status
+router.get('/students', async (req, res) => {
+    try {
+        const query = `
+            SELECT
+                s.reg_no,
+                s.name,
+                s.cgpa,
+                s.email,
+                gm.group_id,
+                pg.group_name,
+                CASE WHEN gm.group_id IS NOT NULL THEN 'In Group' ELSE 'Unassigned' END as status
+            FROM students s
+            LEFT JOIN group_members gm ON s.reg_no = gm.student_reg_no
+            LEFT JOIN project_groups pg ON gm.group_id = pg.group_id
+            ORDER BY s.name
+        `;
+        const result = await db.query(query);
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
+    }
+});
+
+// Endpoint: DELETE /api/admin/students/:regNo
+// Purpose: Delete a student and remove them from any group
+router.delete('/students/:regNo', async (req, res) => {
+    const { regNo } = req.params;
+
+    try {
+        const check = await db.query('SELECT reg_no FROM students WHERE reg_no = $1', [regNo]);
+        if (check.rows.length === 0) {
+            return res.status(404).json({ msg: 'Student not found.' });
+        }
+
+        // CASCADE will handle group_members and marks
+        await db.query('DELETE FROM students WHERE reg_no = $1', [regNo]);
+
+        res.json({ msg: 'Student deleted successfully.' });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
+    }
+});
+
+// ═══════════════════════════════════════════════════════════
+// FEATURE 5: Create Student Groups
+// ═══════════════════════════════════════════════════════════
+
+// Endpoint: GET /api/admin/unassigned-students
+// Purpose: Get students who are not currently part of any group
+router.get('/unassigned-students', async (req, res) => {
+    try {
+        const query = `
+            SELECT s.reg_no, s.name, s.cgpa, s.email
+            FROM students s
+            LEFT JOIN group_members gm ON s.reg_no = gm.student_reg_no
+            WHERE gm.group_id IS NULL
+            ORDER BY s.name
+        `;
+        const result = await db.query(query);
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
+    }
+});
+
+// Endpoint: POST /api/admin/create-group
+// Purpose: Create a new group from selected students (up to 5)
+router.post('/create-group', async (req, res) => {
+    const { group_name, password, student_reg_nos } = req.body;
+
+    if (!group_name || !password || !student_reg_nos || student_reg_nos.length === 0) {
+        return res.status(400).json({ msg: 'Please provide group name, password, and at least one student.' });
+    }
+
+    if (student_reg_nos.length > 5) {
+        return res.status(400).json({ msg: 'A group can have at most 5 members.' });
+    }
+
+    try {
+        // Check if group name already exists
+        const existingGroup = await db.query('SELECT group_id FROM project_groups WHERE group_name = $1', [group_name]);
+        if (existingGroup.rows.length > 0) {
+            return res.status(400).json({ msg: 'A group with this name already exists.' });
+        }
+
+        // Verify all students exist and are not already in a group
+        const checkMembers = await db.query(
+            'SELECT student_reg_no FROM group_members WHERE student_reg_no = ANY($1::varchar[])',
+            [student_reg_nos]
+        );
+        if (checkMembers.rows.length > 0) {
+            const alreadyAssigned = checkMembers.rows.map(r => r.student_reg_no).join(', ');
+            return res.status(400).json({ msg: `Students already in a group: ${alreadyAssigned}` });
+        }
+
+        // Hash password and create group
+        const salt = await bcrypt.genSalt(10);
+        const password_hash = await bcrypt.hash(password, salt);
+
+        const newGroup = await db.query(
+            'INSERT INTO project_groups (group_name, password_hash) VALUES ($1, $2) RETURNING group_id',
+            [group_name, password_hash]
+        );
+        const groupId = newGroup.rows[0].group_id;
+
+        // Add members to group
+        for (const reg_no of student_reg_nos) {
+            await db.query('INSERT INTO group_members (group_id, student_reg_no) VALUES ($1, $2)', [groupId, reg_no]);
+            await db.query('INSERT INTO marks (student_reg_no, group_id) VALUES ($1, $2)', [reg_no, groupId]);
+        }
+
+        res.status(201).json({ msg: `Group "${group_name}" created with ${student_reg_nos.length} members.`, groupId });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
+    }
+});
+
+// Endpoint: POST /api/admin/auto-create-groups
+// Purpose: Automatically create groups of 5 from unassigned students
+router.post('/auto-create-groups', async (req, res) => {
+    try {
+        // Get all unassigned students
+        const unassignedRes = await db.query(`
+            SELECT s.reg_no, s.name
+            FROM students s
+            LEFT JOIN group_members gm ON s.reg_no = gm.student_reg_no
+            WHERE gm.group_id IS NULL
+            ORDER BY s.name
+        `);
+
+        const students = unassignedRes.rows;
+
+        if (students.length === 0) {
+            return res.status(200).json({ msg: 'No unassigned students available.' });
+        }
+
+        if (students.length < 5) {
+            return res.status(400).json({ msg: `Only ${students.length} unassigned students. Need at least 5 to form a group.` });
+        }
+
+        // Shuffle students for random grouping
+        for (let i = students.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [students[i], students[j]] = [students[j], students[i]];
+        }
+
+        let groupCount = 0;
+        const defaultPassword = 'capstone123';
+        const salt = await bcrypt.genSalt(10);
+        const password_hash = await bcrypt.hash(defaultPassword, salt);
+
+        // Get the next group number for naming
+        const maxGroupRes = await db.query("SELECT COUNT(*) as total FROM project_groups");
+        let nextGroupNum = parseInt(maxGroupRes.rows[0].total) + 1;
+
+        // Create groups of 5
+        for (let i = 0; i + 4 < students.length; i += 5) {
+            const groupMembers = students.slice(i, i + 5);
+            const groupName = `Auto-Group-${nextGroupNum}`;
+
+            const newGroup = await db.query(
+                'INSERT INTO project_groups (group_name, password_hash) VALUES ($1, $2) RETURNING group_id',
+                [groupName, password_hash]
+            );
+            const groupId = newGroup.rows[0].group_id;
+
+            for (const student of groupMembers) {
+                await db.query('INSERT INTO group_members (group_id, student_reg_no) VALUES ($1, $2)', [groupId, student.reg_no]);
+                await db.query('INSERT INTO marks (student_reg_no, group_id) VALUES ($1, $2)', [student.reg_no, groupId]);
+            }
+
+            groupCount++;
+            nextGroupNum++;
+        }
+
+        const remaining = students.length % 5;
+        let message = `${groupCount} groups created successfully.`;
+        if (remaining > 0) {
+            message += ` ${remaining} students remain unassigned (not enough for a full group of 5).`;
+        }
+        message += ` Default password: "${defaultPassword}"`;
+
+        res.status(201).json({ msg: message });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
+    }
+});
+
+// ═══════════════════════════════════════════════════════════
+// FEATURE 6: Remove Student from Group
+// ═══════════════════════════════════════════════════════════
+
+// Endpoint: DELETE /api/admin/groups/:groupId/members/:regNo
+// Purpose: Remove a student from a specific group
+router.delete('/groups/:groupId/members/:regNo', async (req, res) => {
+    const { groupId, regNo } = req.params;
+
+    try {
+        // Check if the student is in this group
+        const check = await db.query(
+            'SELECT * FROM group_members WHERE group_id = $1 AND student_reg_no = $2',
+            [groupId, regNo]
+        );
+        if (check.rows.length === 0) {
+            return res.status(404).json({ msg: 'Student is not a member of this group.' });
+        }
+
+        // Remove from group_members
+        await db.query('DELETE FROM group_members WHERE group_id = $1 AND student_reg_no = $2', [groupId, regNo]);
+
+        // Remove associated marks for this group
+        await db.query('DELETE FROM marks WHERE student_reg_no = $1 AND group_id = $2', [regNo, groupId]);
+
+        res.json({ msg: 'Student removed from group successfully.' });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
+    }
+});
+
 module.exports = router;
+

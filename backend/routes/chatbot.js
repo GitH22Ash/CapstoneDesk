@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const OpenAI = require('openai');
 const rateLimit = require('express-rate-limit');
 
 // Rate limiter: 20 requests per minute per IP
@@ -33,38 +33,44 @@ router.post('/message', chatLimiter, async (req, res) => {
         return res.status(400).json({ msg: 'Message too long. Please keep it under 500 characters.' });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.XAI_API_KEY;
     if (!apiKey) {
         return res.status(500).json({ msg: 'AI service is not configured. Please contact the administrator.' });
     }
 
     try {
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-
-        // Build conversation context from history (last 20 messages)
-        const history = (conversationHistory || []).slice(-20);
-        let contextMessages = SYSTEM_PROMPT + '\n\nConversation so far:\n';
-        for (const msg of history) {
-            contextMessages += `${msg.role === 'user' ? 'Student' : 'Mentor'}: ${msg.content}\n`;
-        }
-        contextMessages += `Student: ${message}\nMentor:`;
-
-        const result = await model.generateContent({
-            contents: [{ role: 'user', parts: [{ text: contextMessages }] }],
-            generationConfig: {
-                maxOutputTokens: 1000,
-                temperature: 0.7,
-            },
+        const client = new OpenAI({
+            apiKey: apiKey,
+            baseURL: 'https://api.x.ai/v1',
         });
 
-        const response = result.response;
-        const text = response.text();
+        // Build conversation messages from history (last 20 messages)
+        const history = (conversationHistory || []).slice(-20);
+        const messages = [
+            { role: 'system', content: SYSTEM_PROMPT },
+        ];
 
+        for (const msg of history) {
+            messages.push({
+                role: msg.role === 'user' ? 'user' : 'assistant',
+                content: msg.content,
+            });
+        }
+
+        messages.push({ role: 'user', content: message });
+
+        const completion = await client.chat.completions.create({
+            model: 'grok-3-mini-fast',
+            messages: messages,
+            max_tokens: 1000,
+            temperature: 0.7,
+        });
+
+        const text = completion.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
         res.json({ reply: text });
     } catch (err) {
         console.error('Chatbot error:', err.message);
-        if (err.message?.includes('API_KEY')) {
+        if (err.message?.includes('API_KEY') || err.message?.includes('api_key')) {
             return res.status(500).json({ msg: 'Invalid AI API key. Please contact the administrator.' });
         }
         res.status(500).json({ msg: 'Failed to get AI response. Please try again.' });
