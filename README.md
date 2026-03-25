@@ -110,7 +110,7 @@ ADMIN_EMAIL="admin@university.edu"
 ADMIN_PASSWORD="supersecretpassword"
 
 # Google Gemini API
-GEMINI_API_KEY="your_google_gemini_api_key"
+GROK_API_KEY="your_grok_api_key"
 
 # Cloudinary (File Uploads)
 CLOUDINARY_CLOUD_NAME="your_cloud_name"
