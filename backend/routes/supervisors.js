@@ -44,7 +44,7 @@ router.get('/preferences', auth, async (req, res) => {
             return res.status(404).json({ msg: 'Supervisor not found' });
         }
 
-        res.json({ max_groups: result.rows[0].max_groups || 5 });
+        res.json({ max_groups: result.rows[0].max_groups || 3 });
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server Error');

@@ -6,7 +6,7 @@ import VideoCall from './VideoCall';
 function SupervisorDashboard() {
     const [groups, setGroups] = useState([]);
     const [expandedGroup, setExpandedGroup] = useState(null);
-    const [maxGroups, setMaxGroups] = useState(5);
+    const [maxGroups, setMaxGroups] = useState(3);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
@@ -44,7 +44,7 @@ function SupervisorDashboard() {
                     API.get('/supervisors/preferences')
                 ]);
                 setGroups(groupsRes.data || []);
-                setMaxGroups(prefRes.data?.max_groups ?? 5);
+                setMaxGroups(prefRes.data?.max_groups ?? 3);
 
                 // Decode token to get supervisor ID
                 try {

@@ -70,7 +70,7 @@ function AIChatbot() {
                 onMouseLeave={e => { e.target.style.transform = 'scale(1)'; }}
             >
                 <span style={{ fontSize: '1.6rem', color: '#fff' }}>
-                    {isOpen ? '✕' : '🤖'}
+                    {isOpen ? '✕' : '🚀'}
                 </span>
             </button>
 
@@ -91,10 +91,10 @@ function AIChatbot() {
                         background: 'linear-gradient(135deg, rgba(59,130,246,0.15), rgba(6,182,212,0.1))',
                     }}>
                         <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#fff' }}>
-                            🤖 AI Mentor
+                            🚀 Project Buddy
                         </h3>
                         <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)' }}>
-                            Your project assistant • Powered by Gemini
+                            Your project assistant • Powered by Grok
                         </p>
                     </div>
 

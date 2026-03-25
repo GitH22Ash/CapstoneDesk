@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const OpenAI = require('openai');
 const rateLimit = require('express-rate-limit');
 const auth = require('../middleware/auth');
 const https = require('https');
@@ -34,7 +34,7 @@ router.post('/summarize', auth, summarizeLimiter, async (req, res) => {
         return res.status(400).json({ msg: 'File URL and name are required.' });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.XAI_API_KEY;
     if (!apiKey) {
         return res.status(500).json({ msg: 'AI service is not configured. Please contact the administrator.' });
     }
@@ -60,8 +60,10 @@ router.post('/summarize', auth, summarizeLimiter, async (req, res) => {
         // Truncate to avoid token limits (first 5000 chars)
         const truncatedText = textContent.substring(0, 5000);
 
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const client = new OpenAI({
+            apiKey: apiKey,
+            baseURL: 'https://api.x.ai/v1',
+        });
 
         const prompt = `You are an academic document summarizer. Summarize the following document content concisely. Highlight key points, findings, and conclusions. Format with bullet points for readability.
 
@@ -72,15 +74,17 @@ ${truncatedText}
 
 Provide a clear, structured summary:`;
 
-        const result = await model.generateContent({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            generationConfig: {
-                maxOutputTokens: 1500,
-                temperature: 0.3,
-            },
+        const completion = await client.chat.completions.create({
+            model: 'grok-3-mini-fast',
+            messages: [
+                { role: 'system', content: 'You are an academic document summarizer. Provide clear, structured summaries with bullet points.' },
+                { role: 'user', content: prompt },
+            ],
+            max_tokens: 1500,
+            temperature: 0.3,
         });
 
-        const summary = result.response.text();
+        const summary = completion.choices[0]?.message?.content || 'Failed to generate summary.';
         res.json({ summary });
     } catch (err) {
         console.error('Summarizer error:', err.message);
