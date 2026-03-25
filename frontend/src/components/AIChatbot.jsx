@@ -4,7 +4,7 @@ import { API } from '../api';
 function AIChatbot() {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState([
-        { role: 'assistant', content: 'Hi! 👋 I\'m your project mentor. Ask me anything about your capstone project — architecture, coding, documentation, or project management. How can I help you today?' }
+        { role: 'assistant', content: 'Hi! 👋 I\'m your project buddy. Ask me anything about your capstone project — architecture, coding, documentation, or project management. How can I help you today?' }
     ]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
@@ -152,7 +152,7 @@ function AIChatbot() {
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={handleKeyDown}
                             maxLength={500}
-                            placeholder="Ask your mentor..."
+                            placeholder="Ask your buddy..."
                             id="chatbot-input"
                             style={{
                                 flex: 1, padding: '10px 14px', borderRadius: '10px',

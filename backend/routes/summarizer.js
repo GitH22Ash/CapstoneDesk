@@ -43,13 +43,11 @@ router.post('/summarize', auth, summarizeLimiter, async (req, res) => {
         let textContent = '';
 
         if (file_type === 'pdf') {
-            // Extract text from PDF
             const pdfParse = require('pdf-parse');
             const buffer = await fetchFileBuffer(file_url);
             const pdfData = await pdfParse(buffer);
             textContent = pdfData.text;
         } else if (['ppt', 'pptx'].includes(file_type)) {
-            // For PPT files, we'll send a note that text extraction is limited
             textContent = `[This is a PowerPoint file: ${file_name}. Full text extraction from PPT is limited. Providing a general summary request.]`;
         }
 
@@ -62,7 +60,7 @@ router.post('/summarize', auth, summarizeLimiter, async (req, res) => {
 
         const client = new OpenAI({
             apiKey: apiKey,
-            baseURL: 'https://api.x.ai/v1',
+            baseURL: 'https://api.groq.com/openai/v1',
         });
 
         const prompt = `You are an academic document summarizer. Summarize the following document content concisely. Highlight key points, findings, and conclusions. Format with bullet points for readability.
@@ -75,7 +73,7 @@ ${truncatedText}
 Provide a clear, structured summary:`;
 
         const completion = await client.chat.completions.create({
-            model: 'grok-3-mini-fast',
+            model: 'llama-3.3-70b-versatile',
             messages: [
                 { role: 'system', content: 'You are an academic document summarizer. Provide clear, structured summaries with bullet points.' },
                 { role: 'user', content: prompt },

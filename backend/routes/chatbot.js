@@ -28,7 +28,6 @@ router.post('/message', chatLimiter, async (req, res) => {
         return res.status(400).json({ msg: 'Message cannot be empty.' });
     }
 
-    // Cost control: limit input length
     if (message.length > 500) {
         return res.status(400).json({ msg: 'Message too long. Please keep it under 500 characters.' });
     }
@@ -41,7 +40,7 @@ router.post('/message', chatLimiter, async (req, res) => {
     try {
         const client = new OpenAI({
             apiKey: apiKey,
-            baseURL: 'https://api.x.ai/v1',
+            baseURL: 'https://api.groq.com/openai/v1',
         });
 
         // Build conversation messages from history (last 20 messages)
@@ -60,7 +59,7 @@ router.post('/message', chatLimiter, async (req, res) => {
         messages.push({ role: 'user', content: message });
 
         const completion = await client.chat.completions.create({
-            model: 'grok-3-mini-fast',
+            model: 'llama-3.3-70b-versatile',
             messages: messages,
             max_tokens: 1000,
             temperature: 0.7,
@@ -70,7 +69,7 @@ router.post('/message', chatLimiter, async (req, res) => {
         res.json({ reply: text });
     } catch (err) {
         console.error('Chatbot error:', err.message);
-        if (err.message?.includes('API_KEY') || err.message?.includes('api_key')) {
+        if (err.status === 401) {
             return res.status(500).json({ msg: 'Invalid AI API key. Please contact the administrator.' });
         }
         res.status(500).json({ msg: 'Failed to get AI response. Please try again.' });
