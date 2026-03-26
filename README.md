@@ -15,7 +15,7 @@ This system replaces manual workflows with a smart, fully digital solution featu
 
 ### 🧑‍🎓 Student Portal
 - **Group Registration:** Register teams of exactly 5 members. Validation ensures no duplicate registrations. Improved UI with password visibility toggles.
-- **AI Mentor Chatbot:** A Grok AI and Gemini-powered dual AI assistant that answers project-related queries and provides guidance.
+- **AI Mentor Chatbot:** A Grok AI-powered AI assistant that answers project-related queries and provides guidance.
 - **Project Submissions:** Drag-and-drop Cloudinary uploading for PPTs and PDFs (up to 10MB). Students can dynamically delete incorrectly uploaded files.
 - **Live Video Calls:** Start direct WebRTC video calls with assigned supervisors (powered by Socket.IO signaling).
 
@@ -78,7 +78,7 @@ Make sure you have installed:
 - [Node.js](https://nodejs.org/) (v16+ recommended)
 - [Git](https://git-scm.com/)
 - PostgreSQL Database (e.g., [Neon](https://neon.tech/) or [Supabase](https://supabase.com/))
-- Api Keys for: [Google Gemini AI](https://aistudio.google.com/), [Cloudinary](https://cloudinary.com/), and [Sentry](https://sentry.io/).
+- Api Keys for: [Grok AI](https://console.groq.com/keys), [Cloudinary](https://cloudinary.com/), and [Sentry](https://sentry.io/).
 
 ---
 
