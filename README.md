@@ -2,9 +2,10 @@
 
 ![Build](https://img.shields.io/badge/build-passing-brightgreen)
 ![Made with](https://img.shields.io/badge/Made%20with-React%20%26%20Node-blue)
+![Platform](https://img.shields.io/badge/Platform-Web%20%26%20Android-green)
 ![State](https://img.shields.io/badge/Status-Beta-purple)
 
-A **comprehensive, AI-powered full-stack web application** designed to streamline university project group registration, file submission, WebRTC video calling, supervisor assignment, and administrative management.
+A **comprehensive, AI-powered cross-platform Web and Android application** designed to streamline university project group registration, file submission, WebRTC video calling, supervisor assignment, and administrative management.
 
 This system replaces manual workflows with a smart, fully digital solution featuring real-time communication, AI chatbots, and Excel data processing.
 
@@ -13,14 +14,14 @@ This system replaces manual workflows with a smart, fully digital solution featu
 ## ✨ Key Features
 
 ### 🧑‍🎓 Student Portal
-- **Group Registration:** Register teams of exactly 5 members. Validation ensures no duplicate registrations.
-- **AI Mentor Chatbot:** A Gemini-powered AI assistant that answers project-related queries and provides guidance.
-- **Project Submissions:** Drag-and-drop Cloudinary uploading for PPTs and PDFs (up to 10MB).
+- **Group Registration:** Register teams of exactly 5 members. Validation ensures no duplicate registrations. Improved UI with password visibility toggles.
+- **AI Mentor Chatbot:** A Grok AI and Gemini-powered dual AI assistant that answers project-related queries and provides guidance.
+- **Project Submissions:** Drag-and-drop Cloudinary uploading for PPTs and PDFs (up to 10MB). Students can dynamically delete incorrectly uploaded files.
 - **Live Video Calls:** Start direct WebRTC video calls with assigned supervisors (powered by Socket.IO signaling).
 
 ### 👨‍🏫 Supervisor Portal
-- **Group Management:** View assigned groups, student details, and enter milestone review marks.
-- **AI PDF Summarizer:** One-click Gemini AI summaries for submitted student documents, saving countless reading hours.
+- **Group Management:** View assigned groups with dedicated submission status indicators. Enter individual milestone review marks and let the dashboard auto-calculate final averages (validated 0-100).
+- **AI PDF Summarizer:** One-click Grok AI summaries for submitted student documents, saving countless reading hours.
 - **Video Conferencing:** Participate in live, browser-to-browser WebRTC video calls with student groups.
 - **Profile Security:** Secure password management and customizable group-load preferences.
 
@@ -39,7 +40,7 @@ This system replaces manual workflows with a smart, fully digital solution featu
 | 🎨 **Frontend** | React.js (Vite), Tailwind CSS, Socket.IO Client |
 | ⚙️ **Backend**  | Node.js, Express.js, Socket.IO, Multer, Sentry |
 | 🗄️ **Database** | PostgreSQL (NeonDB), node-postgres (`pg`)       |
-| 🤖 **AI & Media** | Google Gemini API (`@google/generative-ai`), Cloudinary |
+| 🤖 **AI & Media** | Grok API (`XAI_API_KEY`), Cloudinary |
 | 🔑 **Security** | JWT (JSON Web Tokens), Bcryptjs, Express-Rate-Limit |
 | 🔄 **DevOps**   | GitHub Actions (CI build/lint pipeline)    |
 
@@ -150,6 +151,17 @@ npm run dev
 ```
 
 > Frontend runs at 👉 `http://localhost:5173`
+
+---
+
+#### 4️⃣ Android App (Capacitor) 📱
+
+The project is fully wrapped with native Android support via Capacitor. To generate your own Android `.apk`:
+1. Ensure the frontend is built: `cd frontend && npm run build`
+2. Sync the assets to the Android library: `npx cap sync`
+3. Download and install **Android Studio**.
+4. Inside Android Studio, open the `frontend/android/` folder.
+5. In the top nav menu, click **Build > Generate App Bundles or APKs > Build APK(s)**.
 
 ---
 
