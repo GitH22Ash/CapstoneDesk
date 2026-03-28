@@ -118,4 +118,70 @@ router.post('/login', async (req, res) => {
     }
 });
 
+// Endpoint: PUT /api/groups/change-password
+// Purpose: Authenticate a group using current password and update to new password.
+router.put('/change-password', async (req, res) => {
+    const { group_id, currentPassword, newPassword } = req.body;
+
+    if (!group_id || !currentPassword || !newPassword) {
+        return res.status(400).json({ msg: 'Please provide all required fields.' });
+    }
+
+    try {
+        const groupResult = await db.query('SELECT password_hash FROM project_groups WHERE group_id = $1', [group_id]);
+        if (groupResult.rows.length === 0) {
+            return res.status(404).json({ msg: 'Group not found.' });
+        }
+
+        const group = groupResult.rows[0];
+        const isMatch = await bcrypt.compare(currentPassword, group.password_hash);
+        if (!isMatch) {
+            return res.status(400).json({ msg: 'Invalid current password.' });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const new_password_hash = await bcrypt.hash(newPassword, salt);
+
+        await db.query('UPDATE project_groups SET password_hash = $1 WHERE group_id = $2', [new_password_hash, group_id]);
+        res.json({ msg: 'Password updated successfully.' });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
+    }
+});
+
+// Endpoint: PUT /api/groups/change-name
+// Purpose: Authenticate a group using current password and update group name.
+router.put('/change-name', async (req, res) => {
+    const { group_id, currentPassword, newGroupName } = req.body;
+
+    if (!group_id || !currentPassword || !newGroupName) {
+        return res.status(400).json({ msg: 'Please provide all required fields.' });
+    }
+
+    try {
+        const groupResult = await db.query('SELECT password_hash FROM project_groups WHERE group_id = $1', [group_id]);
+        if (groupResult.rows.length === 0) {
+            return res.status(404).json({ msg: 'Group not found.' });
+        }
+
+        const group = groupResult.rows[0];
+        const isMatch = await bcrypt.compare(currentPassword, group.password_hash);
+        if (!isMatch) {
+            return res.status(400).json({ msg: 'Invalid current password.' });
+        }
+
+        const nameCheck = await db.query('SELECT group_id FROM project_groups WHERE group_name = $1 AND group_id != $2', [newGroupName, group_id]);
+        if (nameCheck.rows.length > 0) {
+            return res.status(400).json({ msg: 'Group name is already taken.' });
+        }
+
+        await db.query('UPDATE project_groups SET group_name = $1 WHERE group_id = $2', [newGroupName, group_id]);
+        res.json({ msg: 'Group name updated successfully.', group_name: newGroupName });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
+    }
+});
+
 module.exports = router;

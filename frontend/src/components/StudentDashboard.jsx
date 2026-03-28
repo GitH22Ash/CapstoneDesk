@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { API } from '../api';
 import AIChatbot from './AIChatbot';
 import FileUpload from './FileUpload';
 import VideoCall from './VideoCall';
@@ -8,6 +9,20 @@ function StudentDashboard() {
     const [groupData, setGroupData] = useState(null);
     const [activeTab, setActiveTab] = useState('members');
     const [showVideoCall, setShowVideoCall] = useState(false);
+    
+    // Settings state
+    const [showChangePassword, setShowChangePassword] = useState(false);
+    const [currentPassword, setCurrentPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+
+    const [newGroupName, setNewGroupName] = useState('');
+    const [groupNameCurrentPassword, setGroupNameCurrentPassword] = useState('');
+
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
+
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -24,11 +39,78 @@ function StudentDashboard() {
         navigate('/');
     };
 
+    const handleChangePassword = async () => {
+        setError('');
+        setSuccess('');
+        if (!currentPassword || !newPassword || !confirmPassword) {
+            setError('Please fill all password fields.');
+            return;
+        }
+        if (newPassword.length < 6) {
+            setError('New password must be at least 6 characters.');
+            return;
+        }
+        if (newPassword !== confirmPassword) {
+            setError('New passwords do not match.');
+            return;
+        }
+
+        try {
+            setLoading(true);
+            await API.put('/groups/change-password', {
+                group_id: groupData.group_id,
+                currentPassword,
+                newPassword: newPassword
+            });
+            setSuccess('Password changed successfully!');
+            setShowChangePassword(false);
+            setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
+            setTimeout(() => setSuccess(''), 3000);
+        } catch (err) {
+            setError(err.response?.data?.msg || 'Failed to change password.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleChangeGroupName = async () => {
+        setError('');
+        setSuccess('');
+        if (!groupNameCurrentPassword || !newGroupName) {
+            setError('Please fill all fields to change group name.');
+            return;
+        }
+
+        try {
+            setLoading(true);
+            const res = await API.put('/groups/change-name', {
+                group_id: groupData.group_id,
+                currentPassword: groupNameCurrentPassword,
+                newGroupName: newGroupName
+            });
+            setSuccess('Group name updated successfully!');
+            setGroupNameCurrentPassword('');
+            setNewGroupName('');
+            
+            // Update sessionStorage and local state
+            const updatedData = { ...groupData, group_name: res.data.group_name };
+            sessionStorage.setItem('groupData', JSON.stringify(updatedData));
+            setGroupData(updatedData);
+
+            setTimeout(() => setSuccess(''), 3000);
+        } catch (err) {
+            setError(err.response?.data?.msg || 'Failed to change group name.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     if (!groupData) return null;
 
     const tabs = [
         { key: 'members', label: '👥 Members', desc: 'View group members & marks' },
         { key: 'submissions', label: '📁 Submissions', desc: 'Upload & manage files' },
+        { key: 'settings', label: '⚙ Settings', desc: 'Update group name & password' },
     ];
 
     return (
@@ -177,7 +259,7 @@ function StudentDashboard() {
                                             border: '1px solid rgba(59,130,246,0.2)'
                                         }}>
                                             <p style={{ color: '#60a5fa', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>
-                                                Average
+                                                Total Marks
                                             </p>
                                             <p style={{ fontWeight: 700, fontSize: '1.2rem', color: '#60a5fa' }}>
                                                 {avg}
@@ -198,6 +280,92 @@ function StudentDashboard() {
                             groupId={groupData.group_id}
                             uploadedBy={groupData.members?.[0]?.reg_no || 'unknown'}
                         />
+                    </div>
+                )}
+
+                {/* Settings Tab */}
+                {activeTab === 'settings' && (
+                    <div className="animate-fade-in" style={{ display: 'grid', gap: '1.5rem' }}>
+                        {error && <div className="alert alert-error" style={{ marginBottom: '0.5rem' }}>{error}</div>}
+                        {success && <div className="alert alert-success" style={{ marginBottom: '0.5rem' }}>{success}</div>}
+
+                        {/* Change Group Name */}
+                        <div className="glass-card" style={{ padding: '1.5rem' }}>
+                            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1rem' }}>🏷️ Change Group Name</h3>
+                            <div style={{ display: 'grid', gap: '1rem', maxWidth: '400px' }}>
+                                <div>
+                                    <label className="form-label">Current Group Name</label>
+                                    <input type="text" className="form-input" value={groupData.group_name} disabled style={{ opacity: 0.7 }} />
+                                </div>
+                                <div>
+                                    <label className="form-label">New Group Name</label>
+                                    <input type="text" className="form-input" value={newGroupName}
+                                        onChange={(e) => setNewGroupName(e.target.value)}
+                                        placeholder="Enter new group name" />
+                                </div>
+                                <div>
+                                    <label className="form-label">Current Password</label>
+                                    <input type="password" className="form-input" value={groupNameCurrentPassword}
+                                        onChange={(e) => setGroupNameCurrentPassword(e.target.value)}
+                                        placeholder="Enter current password to verify" />
+                                </div>
+                                <div>
+                                    <button className="btn-primary" onClick={handleChangeGroupName}
+                                        disabled={loading}
+                                        style={{ fontSize: '0.85rem', padding: '0.5rem 1.25rem' }}>
+                                        {loading ? 'Updating...' : 'Update Group Name'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Change Password */}
+                        <div className="glass-card" style={{ padding: '1.5rem' }}>
+                            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1rem' }}>🔒 Change Password</h3>
+                            {!showChangePassword ? (
+                                <button
+                                    className="btn-primary"
+                                    onClick={() => setShowChangePassword(true)}
+                                    style={{ fontSize: '0.85rem', padding: '0.5rem 1.25rem' }}
+                                >
+                                    Change Password
+                                </button>
+                            ) : (
+                                <div style={{ display: 'grid', gap: '1rem', maxWidth: '400px' }}>
+                                    <div>
+                                        <label className="form-label">Current Password</label>
+                                        <input type="password" className="form-input" value={currentPassword}
+                                            onChange={(e) => setCurrentPassword(e.target.value)}
+                                            placeholder="Enter current password" />
+                                    </div>
+                                    <div>
+                                        <label className="form-label">New Password</label>
+                                        <input type="password" className="form-input" value={newPassword}
+                                            onChange={(e) => setNewPassword(e.target.value)}
+                                            placeholder="Min 6 characters" />
+                                    </div>
+                                    <div>
+                                        <label className="form-label">Confirm New Password</label>
+                                        <input type="password" className="form-input" value={confirmPassword}
+                                            onChange={(e) => setConfirmPassword(e.target.value)}
+                                            placeholder="Confirm new password" />
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '0.75rem' }}>
+                                        <button className="btn-success" onClick={handleChangePassword}
+                                            disabled={loading}
+                                            style={{ fontSize: '0.85rem', padding: '0.5rem 1.25rem' }}>
+                                            {loading ? 'Changing...' : 'Save Password'}
+                                        </button>
+                                        <button className="btn-secondary" onClick={() => {
+                                            setShowChangePassword(false);
+                                            setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
+                                        }} style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}>
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>

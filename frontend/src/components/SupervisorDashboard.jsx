@@ -394,7 +394,7 @@ function SupervisorDashboard() {
                                                                 return (
                                                                     <div>
                                                                         <p style={{ color: 'var(--accent-emerald)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem', fontWeight: 600 }}>
-                                                                            Average
+                                                                            Total Marks
                                                                         </p>
                                                                         <div className="form-input" style={{ padding: '0.5rem 0.75rem', fontSize: '0.9rem', textAlign: 'center', background: 'rgba(255,255,255,0.05)', color: 'var(--text-primary)' }}>
                                                                             {avg}
