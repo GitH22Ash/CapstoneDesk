@@ -2,31 +2,10 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+const authorize = require('../middleware/authorize');
 
-// Endpoint: POST /api/admin/login
-// Purpose: Authenticate admin using env-based credentials
-router.post('/login', (req, res) => {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-        return res.status(400).json({ msg: 'Please provide email and password.' });
-    }
-
-    const adminEmail = process.env.ADMIN_EMAIL;
-    const adminPassword = process.env.ADMIN_PASSWORD;
-
-    if (email !== adminEmail || password !== adminPassword) {
-        return res.status(400).json({ msg: 'Invalid admin credentials.' });
-    }
-
-    // Generate an admin JWT token
-    const payload = { admin: true };
-    jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '5h' }, (err, token) => {
-        if (err) throw err;
-        res.json({ token, msg: 'Admin login successful.' });
-    });
-});
+// Protect all admin routes
+router.use(authorize(['admin']));
 
 // Endpoint: GET /api/admin/supervisors
 // Purpose: Get all registered supervisors with their current group counts

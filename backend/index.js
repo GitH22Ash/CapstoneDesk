@@ -41,6 +41,9 @@ const chatbotRoutes = require('./routes/chatbot');
 const submissionRoutes = require('./routes/submissions');
 const { router: videoCallRoutes } = require('./routes/videoCall');
 const summarizerRoutes = require('./routes/summarizer');
+const authRoutes = require('./routes/auth');
+const projectRoutes = require('./routes/projects');
+const activityRoutes = require('./routes/activity');
 
 // Use the routes
 app.use('/api/groups', groupRoutes);
@@ -50,6 +53,9 @@ app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/submissions', submissionRoutes);
 app.use('/api/video', videoCallRoutes);
 app.use('/api/summarizer', summarizerRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/projects', projectRoutes);
+app.use('/api/activity', activityRoutes);
 
 // Health check endpoint for UptimeRobot monitoring
 app.get('/api/health', (req, res) => {
